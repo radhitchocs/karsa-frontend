@@ -46,20 +46,18 @@ export function QnaView({ title, body, label, color, questions, totalReceived }:
 
   return (
     <div className="flex flex-col pt-[16vh] gap-4 h-full p-8">
-      <div className="flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <span
-            className="inline-flex items-center rounded-base border-2 border-black px-4 py-1 text-lg font-bold shadow-[2px_2px_0_0_#000] shrink-0"
-            style={{ backgroundColor: color }}
-          >
-            {label}
-          </span>
-          {active && (
-            <h2 ref={titleRef} className="text-lg font-medium truncate">
-              {title}
-            </h2>
-          )}
-        </div>
+      <div className="flex items-center justify-center gap-4 shrink-0">
+        <span
+          className="inline-flex items-center rounded-base border-2 border-black px-4 py-1 text-lg font-bold shadow-[2px_2px_0_0_#000] shrink-0"
+          style={{ backgroundColor: color }}
+        >
+          {label}
+        </span>
+        {active && (
+          <h2 ref={titleRef} className="text-lg font-medium truncate max-w-xs">
+            {title}
+          </h2>
+        )}
         <span className="text-xl font-semibold text-foreground/60 shrink-0">
           {totalReceived} pertanyaan
         </span>

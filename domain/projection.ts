@@ -37,7 +37,7 @@ export function projectForPresenter(session: Session, version: number): Presente
     participants: session.participants,
     groups: session.groups,
     responses: session.responses,
-    questions: session.questions,
+    questions: session.questions.map((q) => ({ ...q })),
     activities: Object.fromEntries(
       Object.entries(session.activities).map(([k, v]) => [k, { ...v, hiddenWords: [...v.hiddenWords] }])
     ),

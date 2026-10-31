@@ -21,6 +21,17 @@ export function QAPanel({
   const questions = view.questions.filter((q) => q.slideId === slide.id);
   const status = activity?.status ?? 'belum';
 
+  const handleToggle = (targetId: string, currentlyVisible: boolean) => {
+    if (!currentlyVisible) {
+      // Hide any other visible question first (single selection)
+      const prev = questions.find((x) => x.visible && x.id !== targetId);
+      if (prev) send({ type: 'question.moderate', questionId: prev.id, visible: false });
+      send({ type: 'question.moderate', questionId: targetId, visible: true });
+    } else {
+      send({ type: 'question.moderate', questionId: targetId, visible: false });
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -64,13 +75,11 @@ export function QAPanel({
             <CardContent className="pt-4 flex items-start gap-3">
               <p className="flex-1 text-sm">{q.text}</p>
               <Button
-                variant="neutral"
+                variant={q.visible ? 'default' : 'neutral'}
                 size="sm"
                 aria-pressed={q.visible}
                 aria-label={q.visible ? `Sembunyikan: ${q.text}` : `Tampilkan: ${q.text}`}
-                onClick={() =>
-                  send({ type: 'question.moderate', questionId: q.id, visible: !q.visible })
-                }
+                onClick={() => handleToggle(q.id, q.visible)}
               >
                 {q.visible ? (
                   <>
