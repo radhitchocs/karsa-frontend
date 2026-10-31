@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { AppHeader } from '@/components/AppHeader';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, PencilIcon, PlayIcon, Trash2Icon } from 'lucide-react';
@@ -103,15 +103,13 @@ export function ProductionHomePage() {
 
   return (
     <main className="flex flex-col min-h-full">
-      <header className="border-b-2 border-border bg-secondary-background px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Image src="/faveicon.svg" alt="" aria-hidden="true" width={40} height={40} />
-          <span className="font-black text-3xl tracking-tight">Karsa</span>
-        </div>
-        <Button variant="neutral" size="sm" onClick={handleLogout}>
-          Keluar
-        </Button>
-      </header>
+      <AppHeader
+        right={
+          <Button variant="neutral" size="sm" onClick={handleLogout}>
+            Keluar
+          </Button>
+        }
+      />
 
       <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">

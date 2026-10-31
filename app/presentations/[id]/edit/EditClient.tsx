@@ -1,7 +1,6 @@
 'use client';
 
 import { Fragment, useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -21,7 +20,6 @@ import {
   TrophyIcon,
   ImageIcon,
   BarChart3Icon,
-  HomeIcon,
   FishIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -69,6 +67,7 @@ import {
 } from '@/domain/model';
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
+import { AppHeader } from '@/components/AppHeader';
 import type { Editor } from '@tiptap/react';
 import { RichTextField, RichTextToolbar, UnavailableHint, pillBase, pillButton, pillGroup } from './RichTextEditor';
 import { PanelNote, SettingsPanel, SlideCanvas, canvasFrameClass } from './SlideCanvas';
@@ -431,61 +430,65 @@ export function EditClient() {
   return (
     <main className="flex flex-col h-screen">
       {/* Top bar */}
-      <header className="border-b-2 border-border bg-secondary-background px-4 py-3 flex items-center gap-3 shrink-0">
-        <div className="flex items-center gap-2 w-[12.25rem] shrink-0">
-          <Image src="/faveicon.svg" alt="" aria-hidden="true" width={40} height={40} />
-          <span className="font-black text-3xl tracking-tight">Karsa</span>
-          <Button variant="neutral" size="icon" className="ml-auto" onClick={() => router.push('/')}>
-            <HomeIcon className="size-4" />
-          </Button>
-        </div>
-        <Input
-          value={title}
-          onChange={(e) => { setTitle(e.target.value); mark(); }}
-          className="flex-1 max-w-xs font-semibold"
-          placeholder="Judul presentasi"
-        />
-        {/* Save status indicator */}
-        {saveStatusLabel[saveStatus] && (
-          <span
-            className={`text-xs ${saveStatus === 'saved' ? 'text-foreground/70' :
-              saveStatus === 'conflict' || saveStatus === 'error' ? 'text-[var(--error)]' :
-                'text-foreground/70'
-              }`}
-          >
-            {saveStatusLabel[saveStatus]}
-          </span>
-        )}
-        {saveStatus === 'conflict' && (
-          <Button variant="neutral" size="sm" onClick={() => window.location.reload()}>
-            Muat Ulang
-          </Button>
-        )}
-        {/* Results tab toggle */}
-        <Button
-          variant={activeTab === 'results' ? 'default' : 'neutral'}
-          size="sm"
-          onClick={() => setActiveTab(activeTab === 'results' ? 'edit' : 'results')}
-        >
-          <BarChart3Icon className="size-4 mr-1" />
-          Hasil
-        </Button>
-        <Button
-          size="sm"
-          data-testid="mulai-sesi-btn"
-          disabled={startMutation.isPending || slides.length === 0}
-          onClick={() => {
-            if (validationErrors.length > 0) {
-              toast.add({ title: 'Tidak dapat memulai sesi', description: validationErrors[0], type: 'error' });
-              return;
-            }
-            startMutation.mutate();
-          }}
-        >
-          <PlayIcon className="size-4 mr-1" />
-          Mulai Sesi
-        </Button>
-      </header>
+      <AppHeader
+        onHome={() => router.push('/')}
+        center={
+          // Status hangs off the input's right edge (absolute) so the centered title never shifts.
+          <div className="relative">
+            <Input
+              value={title}
+              onChange={(e) => { setTitle(e.target.value); mark(); }}
+              className="w-80 max-w-full text-center font-semibold"
+              placeholder="Judul presentasi"
+              aria-label="Judul presentasi"
+            />
+            {(saveStatusLabel[saveStatus] || saveStatus === 'conflict') && (
+              <div className="absolute left-full top-1/2 ml-3 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap">
+                {saveStatusLabel[saveStatus] && (
+                  <span
+                    className={`text-xs ${saveStatus === 'conflict' || saveStatus === 'error' ? 'text-[var(--error)]' : 'text-foreground/70'}`}
+                  >
+                    {saveStatusLabel[saveStatus]}
+                  </span>
+                )}
+                {saveStatus === 'conflict' && (
+                  <Button variant="neutral" size="sm" onClick={() => window.location.reload()}>
+                    Muat Ulang
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        }
+        right={
+          <>
+            {/* Results tab toggle */}
+            <Button
+              variant={activeTab === 'results' ? 'default' : 'neutral'}
+              size="sm"
+              onClick={() => setActiveTab(activeTab === 'results' ? 'edit' : 'results')}
+            >
+              <BarChart3Icon />
+              Hasil
+            </Button>
+            <Button
+              size="sm"
+              data-testid="mulai-sesi-btn"
+              disabled={startMutation.isPending || slides.length === 0}
+              onClick={() => {
+                if (validationErrors.length > 0) {
+                  toast.add({ title: 'Tidak dapat memulai sesi', description: validationErrors[0], type: 'error' });
+                  return;
+                }
+                startMutation.mutate();
+              }}
+            >
+              <PlayIcon />
+              Mulai Sesi
+            </Button>
+          </>
+        }
+      />
 
       {activeTab === 'results' ? (
         <ResultsArea presentationId={id} />

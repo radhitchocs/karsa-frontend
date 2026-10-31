@@ -2,8 +2,9 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon, EyeOffIcon, MessageSquareIcon, UsersIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, EyeIcon, EyeOffIcon, MessageSquareIcon, UsersIcon } from 'lucide-react';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
+import { AppHeader, HeaderTitle } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -63,13 +64,31 @@ export function ActiveView({
       )}
 
       {/* Top bar */}
-      <header className="border-b-2 border-border bg-secondary-background px-4 py-3 flex items-center gap-3 shrink-0">
-        {/* B2: Back button */}
-        <Button variant="neutral" size="sm" className="shrink-0 px-2" onClick={() => setShowBackConfirm(true)}>
-          <ArrowLeftIcon className="size-4" />
-        </Button>
-        <h1 className="font-bold flex-1 truncate min-w-0">{view.title}</h1>
-      </header>
+      <AppHeader
+        onHome={() => setShowBackConfirm(true)}
+        center={
+          <HeaderTitle
+            title={view.title}
+            aside={<Badge variant="default">{view.paused ? 'Dijeda' : 'Aktif'}</Badge>}
+          />
+        }
+        right={
+          <>
+            <span className="flex items-center gap-1 whitespace-nowrap text-sm text-foreground/70">
+              <UsersIcon className="size-4" />
+              {onlineCount}/{view.participants.length} online
+            </span>
+            <Button
+              variant="neutral"
+              size="sm"
+              className="text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-black"
+              onClick={() => send({ type: 'session.end' })}
+            >
+              Tutup Sesi
+            </Button>
+          </>
+        }
+      />
 
       {/* Paused banner */}
       {view.paused && (
@@ -181,13 +200,6 @@ export function ActiveView({
         >
           <section className="flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Sesi</h2>
-            <div className="flex items-center justify-between">
-              <Badge variant="default">{view.paused ? 'Dijeda' : 'Aktif'}</Badge>
-              <span className="flex items-center gap-1 text-sm text-foreground/70">
-                <UsersIcon className="size-4" />
-                {onlineCount}/{view.participants.length} online
-              </span>
-            </div>
             {view.paused && (
               <Button size="sm" className="w-full" onClick={() => send({ type: 'session.resume' })}>
                 Lanjutkan Sesi
@@ -210,20 +222,20 @@ export function ActiveView({
 
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Tipe</h2>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Slide</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Tipe</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Slide</h2>
             </div>
-                <div className="flex items-center justify-between">
-                <span
-                  className="self-end rounded-base border-2 border-border px-2 py-0.5 text-xs font-bold"
-                  style={{ backgroundColor: SLIDE_COLOR[activeSlide.type] }}
-                >
-                  {labels[activeSlide.type]}
-                </span>
-            <p className="text-2xl font-black items-end tabular-nums">
-              {view.activeSlideIndex + 1} / {view.slides.length}
-            </p>
-                </div>
+            <div className="flex items-center justify-between">
+              <span
+                className="self-end rounded-base border-2 border-border px-2 py-0.5 text-xs font-bold"
+                style={{ backgroundColor: SLIDE_COLOR[activeSlide.type] }}
+              >
+                {labels[activeSlide.type]}
+              </span>
+              <p className="text-2xl font-black items-end tabular-nums">
+                {view.activeSlideIndex + 1} / {view.slides.length}
+              </p>
+            </div>
             {activeSlide && (
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-semibold line-clamp-2">{activeSlide.title || labels[activeSlide.type]}</p>
@@ -260,9 +272,6 @@ export function ActiveView({
             )}
           </section>
 
-          <Button variant="neutral" size="sm" className="w-full mt-auto" onClick={() => send({ type: 'session.end' })}>
-            Tutup Sesi
-          </Button>
         </section>
       </div>
 
