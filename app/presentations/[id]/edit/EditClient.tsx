@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   PlusIcon,
+  AlertCircleIcon,
   Trash2Icon,
   PlayIcon,
   CheckIcon,
@@ -26,6 +27,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Dropzone } from '@/components/ui/dropzone';
+import { NumberStepper } from '@/components/ui/number-stepper';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -894,8 +897,8 @@ function SlideEditor({
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col">
-      {/* Header keeps its original 672px width, centered above the wider canvas + panel. */}
-      <div className="mx-auto w-full max-w-2xl">
+      {/* Header: 704px, just wide enough for the longest type label + "Slide NN / NN" on one row; centered above the wider canvas + panel. */}
+      <div className="mx-auto w-full max-w-[44rem]">
         <SlideEditorHeader
           slide={slide}
           index={index}
@@ -962,24 +965,35 @@ function SlideSettings({
       );
     case 'kelompok':
       return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="slide-groups">Jumlah kelompok default</Label>
-          <Input
+          <NumberStepper
             id="slide-groups"
-            type="number"
+            value={slide.groups}
             min={2}
             max={20}
-            value={slide.groups}
-            onChange={(e) => onChange({ groups: Number(e.target.value) })}
-            className="w-24"
+            onChange={(groups) => onChange({ groups })}
+            decrementLabel="Kurangi kelompok"
+            incrementLabel="Tambah kelompok"
           />
+          <PanelNote icon={<AlertCircleIcon className="mt-0.5 size-4 shrink-0" />}>
+            2–20 kelompok. Bisa diubah lagi saat sesi sebelum dibagikan.
+          </PanelNote>
         </div>
       );
     case 'pancing':
       return (
-        <PanelNote>
-          Saat sesi, Anda memancing peserta secara acak untuk menjawab. Tidak ada pengaturan tambahan.
-        </PanelNote>
+        <div className="flex flex-col gap-4">
+          <PanelNote>Ubah judul langsung di kanvas, misalnya pertanyaan yang akan dijawab peserta terpilih.</PanelNote>
+          <section className="flex flex-col gap-2">
+            <Label>Cara kerja saat sesi</Label>
+            <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-sm text-foreground/80">
+              <li>Tekan <strong>Pancing!</strong> untuk memilih satu peserta yang terhubung secara acak.</li>
+              <li>Proyektor menampilkan animasi kolam ikan, lalu nama peserta yang tertangkap.</li>
+              <li>Pilih <strong>Pancing Lagi</strong> untuk memilih ulang, atau <strong>Hapus Peserta</strong> agar ia tidak terpilih lagi di slide ini.</li>
+            </ol>
+          </section>
+        </div>
       );
     case 'kuis':
       return <QuizEditor slide={slide} onChange={onChange} />;
@@ -1009,27 +1023,21 @@ function MateriImageSettings({
     return <PanelNote>Pilih layout bergambar di bilah atas untuk menambahkan gambar.</PanelNote>;
   }
   return (
-    <div className="flex flex-col gap-3">
-      <Label>Gambar</Label>
-      {slots.map(({ key, label, url }) => (
-        <div key={key} className="flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-base border-2 border-border bg-white">
-            {url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={url} alt="" className="size-full object-cover" />
-            ) : (
-              <ImageIcon className="size-4 text-foreground/40" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{label}</p>
-            <p className="text-xs text-foreground/60">{url ? 'Klik gambar di kanvas untuk mengganti' : 'Klik slot di kanvas untuk mengunggah'}</p>
-          </div>
-          {url && (
-            <Button variant="neutral" size="icon-sm" aria-label={`Hapus ${label}`} onClick={() => onChange({ [key]: '' })}>
-              <Trash2Icon className="size-4" />
-            </Button>
-          )}
+    <div className="flex flex-col gap-4">
+      <p className="text-xs text-foreground/60">
+        Seret gambar ke slot atau klik untuk memilih (maks 5 MB). Semua gambar tampil 4:3 dan dipotong agar
+        penuh, apa pun ukuran aslinya.
+      </p>
+      {slots.map(({ key, label, url }, i) => (
+        <div key={key} className="flex flex-col gap-1.5">
+          <Label>{label}</Label>
+          <ImageSlot
+            url={url}
+            label={label}
+            testId={`panel-image-${i}`}
+            onUpload={(u) => onChange({ [key]: u })}
+            onRemove={() => onChange({ [key]: '' })}
+          />
         </div>
       ))}
     </div>
@@ -1065,8 +1073,8 @@ function SlideEditorHeader({
       >
         {/* Invisible widest value sizes the pill; the real one sits centered on top, so 9 → 10 doesn't resize it. */}
         <span className="grid justify-items-center [&>*]:col-start-1 [&>*]:row-start-1">
-          <span className="invisible" aria-hidden="true">{total} / {total}</span>
-          <span>{index + 1} / {total}</span>
+          <span className="invisible" aria-hidden="true">Slide {total} / {total}</span>
+          <span>Slide {index + 1} / {total}</span>
         </span>
       </span>
       <span className={`${pillBase} px-4 text-sm font-bold ${kindColors[slide.type]}`}>
@@ -1088,7 +1096,7 @@ function SlideEditorHeader({
                 size="icon"
                 aria-label="Hapus slide"
                 onClick={onDelete}
-                className="rounded-full text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-black cursor-pointer"
+                className={`rounded-full ${dangerButtonClass}`}
                 data-testid="slide-editor-delete"
               />
             }
@@ -1239,6 +1247,7 @@ function MateriCanvas({
                 url={slide.image}
                 label="Gambar 1"
                 testId="image-slot-0"
+                className="min-w-0 flex-1"
                 onUpload={(url) => onChange({ image: url })}
               />
               {(layout === 'dua-gambar' ||
@@ -1248,6 +1257,7 @@ function MateriCanvas({
                     url={slide.image2 ?? ''}
                     label="Gambar 2"
                     testId="image-slot-1"
+                    className="min-w-0 flex-1"
                     onUpload={(url) => onChange({ image2: url })}
                   />
                 )}
@@ -1259,29 +1269,73 @@ function MateriCanvas({
 }
 
 // ---------------------------------------------------------------------------
-// ImageSlot — C1: clickable image slot that triggers file upload
+// ImageSlot — C1: drop or pick an image (canvas slot and Pengaturan panel)
 // ---------------------------------------------------------------------------
 
-function ImageSlot({ url, label, onUpload, testId }: { url: string; label: string; onUpload: (url: string) => void; testId?: string }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+/** Matches the backend limit on POST /api/assets. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Hover hint (our Tooltip) for an icon button; the child element becomes the trigger. */
+function HintTooltip({ label, children }: { label: string; children: React.ReactElement }) {
+  return (
+    <Tooltip disableHoverablePopup>
+      <TooltipTrigger render={children} />
+      <TooltipContent side="bottom" className="pointer-events-none">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Red text, fills red on hover — destructive icon buttons (delete slide, option, image). */
+const dangerButtonClass = 'text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-black';
+
+async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/api/assets`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+    body: formData,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message ?? `Upload gagal (${res.status})`);
+  }
+  return ((await res.json()) as { url: string }).url;
+}
+
+/**
+ * Drop an image onto the slot or click to pick one. Always shown at 4:3 and
+ * cropped to fill, so every image keeps the same shape whatever its original size.
+ */
+function ImageSlot({
+  url,
+  label,
+  onUpload,
+  onRemove,
+  testId,
+  className = '',
+}: {
+  url: string;
+  label: string;
+  onUpload: (url: string) => void;
+  onRemove?: () => void;
+  testId?: string;
+  className?: string;
+}) {
   const [uploading, setUploading] = useState(false);
 
   async function handleFile(file: File) {
+    if (!file.type.startsWith('image/')) {
+      toast.add({ title: 'Bukan file gambar', description: 'Pilih file JPG, PNG, GIF, atau WebP.', type: 'error' });
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.add({ title: 'Gambar terlalu besar', description: 'Ukuran maksimal 5 MB.', type: 'error' });
+      return;
+    }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(`${API_BASE}/api/assets`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
-        body: formData,
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { message?: string }).message ?? `Upload gagal (${res.status})`);
-      }
-      const data = (await res.json()) as { url: string };
-      onUpload(data.url);
+      onUpload(await uploadImage(file));
     } catch (err) {
       toast.add({ title: 'Upload gagal', description: String(err), type: 'error' });
     } finally {
@@ -1290,34 +1344,46 @@ function ImageSlot({ url, label, onUpload, testId }: { url: string; label: strin
   }
 
   return (
-    <div
-      className={`relative flex-1 border-2 border-dashed border-border rounded-base min-h-[120px] flex items-center justify-center cursor-pointer hover:border-main transition-colors ${uploading ? 'opacity-50' : ''
-        }`}
-      onClick={() => inputRef.current?.click()}
-      role="button"
-      aria-label={`Upload ${label}`}
-      data-testid={testId}
-    >
-      <input
-        ref={inputRef}
-        type="file"
+    <div className={`relative ${className}`}>
+      <Dropzone
+        onFile={handleFile}
         accept="image/*"
-        className="sr-only"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-      />
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={label} className="w-full h-full object-cover rounded-base" />
-      ) : (
-        <div className="flex flex-col items-center gap-1 text-foreground/50">
-          <ImageIcon className="size-6" />
-          <span className="text-xs">{uploading ? 'Mengunggah…' : label}</span>
-        </div>
-      )}
-      {url && (
-        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 rounded-base transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
-          <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">Ganti</span>
-        </div>
+        disabled={uploading}
+        aria-label={url ? `Ganti ${label}` : `Upload ${label}`}
+        data-testid={testId}
+        className={`group/slot relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-base border-2 border-dashed border-border bg-secondary-background transition-colors hover:border-main data-[dragging]:border-solid data-[dragging]:border-main data-[dragging]:bg-main/10 ${uploading ? 'opacity-60' : ''}`}
+      >
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={label} className="size-full object-cover" />
+        ) : (
+          <div className="flex flex-col items-center gap-1 px-2 text-center text-foreground/60">
+            <ImageIcon className="size-6" />
+            <span className="text-xs font-semibold">{uploading ? 'Mengunggah…' : label}</span>
+            {!uploading && <span className="text-[11px] leading-tight">Seret ke sini atau klik</span>}
+          </div>
+        )}
+        {url && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover/slot:bg-black/30 group-hover/slot:opacity-100 group-data-[dragging]/slot:bg-black/30 group-data-[dragging]/slot:opacity-100">
+            <span className="rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
+              {uploading ? 'Mengunggah…' : 'Seret atau klik untuk ganti'}
+            </span>
+          </div>
+        )}
+      </Dropzone>
+      {/* Sibling of the dropzone so clicking it doesn't open the file picker. */}
+      {url && onRemove && (
+        <HintTooltip label="Hapus gambar">
+          <Button
+            variant="neutral"
+            size="icon"
+            aria-label={`Hapus ${label}`}
+            onClick={onRemove}
+            className={`absolute right-2 top-2 rounded-full ${dangerButtonClass}`}
+          >
+            <Trash2Icon />
+          </Button>
+        </HintTooltip>
       )}
     </div>
   );
@@ -1327,6 +1393,9 @@ function ImageSlot({ url, label, onUpload, testId }: { url: string; label: strin
 // OptionsEditor — pilihan / polling options
 // ---------------------------------------------------------------------------
 
+const MIN_OPTIONS = 2;
+const MAX_OPTIONS = 6;
+
 function OptionsEditor({
   slide,
   onChange,
@@ -1334,6 +1403,8 @@ function OptionsEditor({
   slide: Slide;
   onChange: (patch: Partial<Slide>) => void;
 }) {
+  const isPilihan = slide.type === 'pilihan';
+
   function updateOption(i: number, value: string) {
     const next = [...slide.options];
     next[i] = value;
@@ -1341,12 +1412,12 @@ function OptionsEditor({
   }
 
   function addOption() {
-    if (slide.options.length >= 6) return;
+    if (slide.options.length >= MAX_OPTIONS) return;
     onChange({ options: [...slide.options, ''] });
   }
 
   function removeOption(i: number) {
-    if (slide.options.length <= 2) return;
+    if (slide.options.length <= MIN_OPTIONS) return;
     const next = slide.options.filter((_, idx) => idx !== i);
     const correct = slide.correct
       .map((c) => (c > i ? c - 1 : c))
@@ -1355,63 +1426,88 @@ function OptionsEditor({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <Label>Opsi jawaban (2–6)</Label>
-      {slide.options.map((opt, i) => (
-        <div key={i} className="flex items-center gap-2">
-          {slide.type === 'pilihan' && (
-            <button
-              onClick={() => onChange({
-                correct: slide.correct.includes(i)
-                  ? slide.correct.filter((c) => c !== i)
-                  : [...slide.correct, i].sort((a, b) => a - b),
-              })}
-              className={`shrink-0 size-5 rounded border-2 flex items-center justify-center ${slide.correct.includes(i) ? 'bg-[#34D399] border-black' : 'border-border'
-                }`}
-              title="Tandai sebagai jawaban benar (boleh lebih dari satu)"
-            >
-              {slide.correct.includes(i) && <CheckIcon className="size-3" />}
-            </button>
-          )}
-          <span className="shrink-0 w-6 text-sm font-bold text-center">
-            {String.fromCharCode(65 + i)}
+    <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <Label>Opsi jawaban</Label>
+          <span className="text-xs tabular-nums text-foreground/60">
+            {slide.options.length} / {MAX_OPTIONS}
           </span>
-          <Input
-            value={opt}
-            onChange={(e) => updateOption(i, e.target.value)}
-            placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
-          />
-          <button
-            onClick={() => removeOption(i)}
-            disabled={slide.options.length <= 2}
-            className="shrink-0 text-foreground/60 hover:text-[var(--error)] disabled:opacity-20"
-          >
-            <Trash2Icon className="size-4" />
-          </button>
         </div>
-      ))}
-      {slide.type === 'pilihan' && (
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="explanation">Penjelasan jawaban benar (opsional)</Label>
+        {isPilihan && (
+          <p className="-mt-1 text-xs text-foreground/60">Centang opsi yang benar (boleh lebih dari satu).</p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          {slide.options.map((opt, i) => {
+            const letter = String.fromCharCode(65 + i);
+            const isCorrect = slide.correct.includes(i);
+            return (
+              <div key={i} className="flex items-center gap-2">
+                {isPilihan && (
+                  <button
+                    type="button"
+                    aria-label={`Tandai opsi ${letter} sebagai jawaban benar`}
+                    aria-pressed={isCorrect}
+                    onClick={() => onChange({
+                      correct: isCorrect
+                        ? slide.correct.filter((c) => c !== i)
+                        : [...slide.correct, i].sort((a, b) => a - b),
+                    })}
+                    className={`flex size-5 shrink-0 cursor-pointer items-center justify-center rounded border-2 ${isCorrect ? 'border-black bg-[#34D399]' : 'border-border'}`}
+                  >
+                    {isCorrect && <CheckIcon className="size-3" />}
+                  </button>
+                )}
+                <span className="w-4 shrink-0 text-center text-sm font-bold">{letter}</span>
+                <Input
+                  value={opt}
+                  onChange={(e) => updateOption(i, e.target.value)}
+                  placeholder={`Opsi ${letter}`}
+                  aria-label={`Opsi ${letter}`}
+                />
+                <HintTooltip label="Hapus opsi ini">
+                  <Button
+                    variant="neutral"
+                    size="icon"
+                    aria-label={`Hapus opsi ${letter}`}
+                    onClick={() => removeOption(i)}
+                    disabled={slide.options.length <= MIN_OPTIONS}
+                    className={`shrink-0 ${dangerButtonClass}`}
+                  >
+                    <Trash2Icon />
+                  </Button>
+                </HintTooltip>
+              </div>
+            );
+          })}
+        </div>
+
+        <Button
+          variant="neutral"
+          onClick={addOption}
+          disabled={slide.options.length >= MAX_OPTIONS}
+          className="w-full"
+        >
+          <PlusIcon />
+          {slide.options.length >= MAX_OPTIONS ? 'Maksimal 6 opsi' : 'Tambah Opsi'}
+        </Button>
+      </section>
+
+      {isPilihan && (
+        <section className="flex flex-col gap-2 border-t-2 border-border/15 pt-4">
+          <Label htmlFor="explanation">
+            Penjelasan jawaban benar <span className="font-normal text-foreground/60">(opsional)</span>
+          </Label>
           <Textarea
             id="explanation"
             value={slide.explanation}
             onChange={(e) => onChange({ explanation: e.target.value })}
-            rows={2}
-            placeholder="Mengapa opsi ini benar?"
+            rows={3}
+            placeholder="Mengapa opsi ini benar? Ditampilkan setelah jawaban dibuka."
           />
-        </div>
+        </section>
       )}
-      <Button
-        variant="neutral"
-        size="sm"
-        onClick={addOption}
-        disabled={slide.options.length >= 6}
-        className="self-start"
-      >
-        <PlusIcon className="size-4 mr-1" />
-        Tambah Opsi
-      </Button>
     </div>
   );
 }

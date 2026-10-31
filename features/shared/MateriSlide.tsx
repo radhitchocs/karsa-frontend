@@ -99,15 +99,15 @@ export function MateriSlide({
           {heading}
           {text('mt-2')}
         </div>
-        <div className="flex gap-4 flex-1 min-h-0">
+        <div className="flex gap-4 flex-1 min-h-0 items-start">
           {image && (
-            <div className={`${imgBorderClass} flex-1 min-h-0`}>
+            <div className={`${imgBorderClass} flex-1 aspect-[4/3]`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={image} alt="" className="w-full h-full object-cover" />
             </div>
           )}
           {image2 && (
-            <div className={`${imgBorderClass} flex-1 min-h-0`}>
+            <div className={`${imgBorderClass} flex-1 aspect-[4/3]`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={image2} alt="" className="w-full h-full object-cover" />
             </div>
@@ -117,22 +117,22 @@ export function MateriSlide({
     );
   }
 
-  // dua-gambar-tb: text 50% / stacked images 50% — same proportions on all variants
+  // dua-gambar-tb: text 2/3, two stacked 4:3 images 1/3 (narrower so both fit the slide height)
   return (
     <div className="flex gap-4 h-full items-stretch">
       <div className="flex flex-col gap-3 flex-1 min-w-0 justify-center">
         {heading}
         {text()}
       </div>
-      <div className="w-1/2 shrink-0 flex flex-col gap-3 min-h-0">
+      <div className="w-1/3 shrink-0 flex flex-col gap-3 min-h-0 justify-center">
         {image && (
-          <div className={`${imgBorderClass} flex-1 min-h-0`}>
+          <div className={`${imgBorderClass} aspect-[4/3]`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={image} alt="" className="w-full h-full object-cover" />
           </div>
         )}
         {image2 && (
-          <div className={`${imgBorderClass} flex-1 min-h-0`}>
+          <div className={`${imgBorderClass} aspect-[4/3]`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={image2} alt="" className="w-full h-full object-cover" />
           </div>

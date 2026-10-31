@@ -199,10 +199,10 @@ export function SettingsPanel({ children }: { children: React.ReactNode }) {
 }
 
 /** Explanatory note for types without configurable settings. */
-export function PanelNote({ children }: { children: React.ReactNode }) {
+export function PanelNote({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <p className="flex gap-2 text-sm text-foreground/70">
-      <InfoIcon className="mt-0.5 size-4 shrink-0" />
+      {icon ?? <InfoIcon className="mt-0.5 size-4 shrink-0" />}
       <span>{children}</span>
     </p>
   );
