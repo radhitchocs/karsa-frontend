@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon, EyeOffIcon, MessageSquareIcon, UsersIcon } from 'lucide-react';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { labels } from '@/domain/model';
 import { MateriPanel } from './MateriPanel';
 import { InteractivePanel } from './InteractivePanel';
@@ -25,6 +26,7 @@ export function ActiveView({
   const router = useRouter();
   const [showBackConfirm, setShowBackConfirm] = useState(false);
   const [qaOpen, setQaOpen] = useState(false);
+  const filmstripRef = useRef<HTMLDivElement>(null);
   const activeSlide = view.slides[view.activeSlideIndex];
   const activity = activeSlide
     ? (view.activities[activeSlide.id] ?? { status: 'belum', visible: false, hiddenWords: [] })
@@ -35,6 +37,13 @@ export function ActiveView({
 
   // B8: find tanya slides for persistent Q&A panel
   const tanyaSlides = view.slides.filter((s) => s.type === 'tanya');
+
+  // Keep the active slide visible in the filmstrip when navigating via Kembali/Berikutnya
+  useEffect(() => {
+    filmstripRef.current
+      ?.querySelector('[data-active="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [view.activeSlideIndex]);
 
   return (
     <main className="flex flex-col h-screen">
@@ -69,33 +78,6 @@ export function ActiveView({
       )}
 
       <div className="flex flex-1 min-h-0">
-        {/* Slide navigator */}
-        <aside className="w-48 border-r-2 border-border bg-secondary-background overflow-y-auto p-2 flex flex-col gap-1 shrink-0">
-          {view.slides.map((s, i) => (
-            <button
-              key={s.id}
-              onClick={() => !activityOpen && send({ type: 'slide.activate', slideIndex: i })}
-              disabled={activityOpen && i !== view.activeSlideIndex}
-              className={`relative text-left p-2 pl-[10px] overflow-hidden rounded-base border-2 text-xs transition-colors w-full ${
-                i === view.activeSlideIndex
-                  ? 'border-foreground shadow-[2px_2px_0_0_#000] font-semibold'
-                  : activityOpen
-                    ? 'border-transparent opacity-40 cursor-not-allowed'
-                    : 'border-transparent hover:border-foreground/30'
-              }`}
-            >
-              {/* Slide type color bar */}
-              <span
-                className="absolute left-0 inset-y-0 w-[4px]"
-                style={{ backgroundColor: SLIDE_COLOR[s.type] }}
-                aria-hidden="true"
-              />
-              <span className="text-foreground/60 mr-1">{i + 1}.</span>
-              <span className="truncate">{s.title || labels[s.type]}</span>
-            </button>
-          ))}
-        </aside>
-
         {/* B8: Persistent Q&A panel — shown when qaOpen and not on the tanya slide */}
         {qaOpen && tanyaSlides.length > 0 && (
           <div className="w-72 border-l-2 border-border bg-secondary-background overflow-y-auto p-4 shrink-0 flex flex-col gap-3">
@@ -133,7 +115,7 @@ export function ActiveView({
         {/* Slide content */}
         <div className="flex-1 overflow-y-auto p-6">
           {!activeSlide ? (
-            <p className="text-foreground/60">Pilih slide di kiri.</p>
+            <p className="text-foreground/60">Pilih slide di bawah.</p>
           ) : activeSlide.type === 'kuis' ? (
             <QuizPanel view={view} send={send} />
           ) : activeSlide.type === 'materi' ? (
@@ -192,7 +174,10 @@ export function ActiveView({
         </div>
 
         {/* Control sidebar: session state, slide position, navigation */}
-        <aside className="w-72 border-l-2 border-border bg-secondary-background overflow-y-auto p-4 flex flex-col gap-5 shrink-0">
+        <section
+          aria-label="Kontrol sesi"
+          className="w-72 border-l-2 border-border bg-secondary-background overflow-y-auto p-4 flex flex-col gap-5 shrink-0"
+        >
           <section className="flex flex-col gap-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Sesi</h2>
             <div className="flex items-center justify-between">
@@ -277,8 +262,67 @@ export function ActiveView({
           <Button variant="neutral" size="sm" className="w-full mt-auto" onClick={() => send({ type: 'session.end' })}>
             Tutup Sesi
           </Button>
-        </aside>
+        </section>
       </div>
+
+      {/* Slide filmstrip — mirrors the editor filmstrip (EditClient), minus editing actions */}
+      <aside aria-label="Daftar slide" className="shrink-0 border-t-2 border-border bg-secondary-background flex flex-col">
+        <div className="flex items-stretch">
+          <div ref={filmstripRef} className="relative flex-1 overflow-x-auto p-2 flex flex-row min-h-[104px]">
+            {view.slides.map((s, i) => {
+              const isActive = i === view.activeSlideIndex;
+              const locked = activityOpen && !isActive;
+              return (
+                <Fragment key={s.id}>
+                  <div className="w-4 shrink-0" aria-hidden="true" />
+                  <Tooltip disableHoverablePopup>
+                    <TooltipTrigger
+                      render={<button
+                        data-active={isActive}
+                        onClick={() => !activityOpen && send({ type: 'slide.activate', slideIndex: i })}
+                        disabled={locked}
+                        className={`group relative w-40 shrink-0 flex flex-col gap-1 p-2 rounded-base border-2 text-left select-none transition-colors ${isActive
+                          ? 'border-foreground shadow-[2px_2px_0_0_#000] cursor-pointer'
+                          : locked
+                            ? 'border-transparent opacity-40 cursor-not-allowed'
+                            : 'border-transparent hover:border-foreground/30 cursor-pointer'
+                          }`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <span
+                            className="min-w-0 flex-1 text-[14px] font-bold px-1.5 py-0.5 rounded-base border border-black leading-tight"
+                            style={{ backgroundColor: SLIDE_COLOR[s.type] }}
+                          >
+                            <span className="block overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%_-_10px),transparent)]">
+                              {labels[s.type]}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="w-3.5 shrink-0 text-end text-sm font-bold text-foreground/60">
+                            {i + 1}
+                          </span>
+                          <span className="flex-1 truncate text-sm text-foreground/70">
+                            {'- '}{s.title || '(tanpa judul)'}
+                          </span>
+                        </div>
+                      </button>
+                      }
+                    />
+                    <TooltipContent side="top" className="pointer-events-none max-w-64">
+                      <p className="font-bold">Slide {i + 1} - {labels[s.type]}</p>
+                      <p className="truncate text-foreground/70">
+                        {s.title || '(tanpa judul)'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Fragment>
+              );
+            })}
+            {view.slides.length > 0 && <div className="w-4 shrink-0" aria-hidden="true" />}
+          </div>
+        </div>
+      </aside>
     </main>
   );
 }
