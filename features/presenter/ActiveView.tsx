@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { labels } from '@/domain/model';
+import { SlidePreview } from '@/features/shared/SlidePreview';
 import { MateriPanel } from './MateriPanel';
 import { InteractivePanel } from './InteractivePanel';
 import { QAPanel } from './QAPanel';
@@ -281,28 +282,29 @@ export function ActiveView({
                         data-active={isActive}
                         onClick={() => !activityOpen && send({ type: 'slide.activate', slideIndex: i })}
                         disabled={locked}
-                        className={`group relative w-40 shrink-0 flex flex-col gap-1 p-2 rounded-base border-2 text-left select-none transition-colors ${isActive
+                        className={`group relative w-40 aspect-video shrink-0 overflow-hidden rounded-base border-2 bg-white text-left select-none transition-colors ${isActive
                           ? 'border-foreground shadow-[2px_2px_0_0_#000] cursor-pointer'
                           : locked
-                            ? 'border-transparent opacity-40 cursor-not-allowed'
-                            : 'border-transparent hover:border-foreground/30 cursor-pointer'
+                            ? 'border-foreground/20 opacity-40 cursor-not-allowed'
+                            : 'border-foreground/20 hover:border-foreground/50 cursor-pointer'
                           }`}
                       >
-                        <div className="flex items-center gap-1">
+                        <SlidePreview slide={s} />
+                        <div className="absolute inset-x-1 top-1 flex items-start">
                           <span
-                            className="min-w-0 flex-1 text-[14px] font-bold px-1.5 py-0.5 rounded-base border border-black leading-tight"
+                            className="min-w-0 flex-1 text-xs font-bold px-1.5 py-0.5 rounded-base border border-black leading-tight"
                             style={{ backgroundColor: SLIDE_COLOR[s.type] }}
                           >
-                            <span className="block overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%_-_10px),transparent)]">
+                            <span className="block truncate">
                               {labels[s.type]}
                             </span>
                           </span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <span className="w-3.5 shrink-0 text-end text-sm font-bold text-foreground/60">
+                        <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 border-t border-black/20 bg-black/10 px-1.5 py-0.5">
+                          <span className="shrink-0 text-xs text-end font-bold text-foreground/70">
                             {i + 1}
                           </span>
-                          <span className="flex-1 truncate text-sm text-foreground/70">
+                          <span className="flex-1 truncate text-xs text-foreground/70">
                             {'- '}{s.title || '(tanpa judul)'}
                           </span>
                         </div>
