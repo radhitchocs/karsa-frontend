@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.next-e2e/
+.next-e2e-main/
+.next-demo/
+.next-bots/
+.next-gallery/
+.next-screenshots/
+.env.local
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# e2e screenshots (too heavy)
+e2e/screenshots/
+playwright-report/
+test-results/
