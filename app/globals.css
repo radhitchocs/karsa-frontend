@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-jakarta);
+  --color-main: var(--main);
+  --color-secondary-background: var(--secondary-background);
+  --color-main-foreground: var(--main-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-error: var(--error);
+  --spacing-boxShadowX: 4px;
+  --spacing-boxShadowY: 4px;
+  --spacing-reverseBoxShadowX: -4px;
+  --spacing-reverseBoxShadowY: -4px;
+  --radius-base: 5px;
+  --font-weight-base: 500;
+  --font-weight-heading: 800;
+  --shadow-shadow: var(--shadow);
+  --animate-marquee: marquee 5s linear infinite;
+  --animate-marquee2: marquee2 5s linear infinite;
+  --color-chart-active-dot: var(--chart-active-dot);
+  --shadow: var(--shadow);
+  @keyframes marquee {
+  0% {
+    transform: translateX(0%);
+    }
+  100% {
+    transform: translateX(-100%);
+    }
+  }
+  @keyframes marquee2 {
+  0% {
+    transform: translateX(100%);
+    }
+  100% {
+    transform: translateX(0%);
+    }
+  }
+}
+
+:root {
+  color-scheme: light;
+  --background: hsl(46, 88%, 93%);
+  --secondary-background: oklch(100% 0 0);
+  --main: hsl(190, 100%, 45%);
+  --ring: oklch(0% 0 0);
+  --foreground: oklch(0% 0 0);
+  --main-foreground: oklch(0% 0 0);
+  --border: oklch(0% 0 0);
+  --overlay: oklch(0% 0 0 / 0.8);
+  --shadow: 4px 4px 0px 0px var(--border);
+  /* Chart bar colors — ONLY for bar chart bars; never used as slide type chips.
+     Siang Tropis palette: bright, playful. No red (wrong-answer), no green (correct),
+     no gray (dead). Sharing hues with type chips is OK (only one type visible per view).
+     Correct-answer marking: icon + mint border only, never bar color. */
+  --chart-1: #00C6D6;
+  --chart-2: #FFD93D;
+  --chart-3: #FF8FCB;
+  --chart-4: #A78BFA;
+  --chart-5: #FB923C;
+  --chart-6: #60A5FA;
+  --chart-active-dot: #000;
+  --success: #34D399;
+  --success-foreground: #000;
+  --error: hsl(8, 88%, 50%);
+  /* --error-fg: darker shade for text on white/cream — passes WCAG AA 4.5:1 */
+  --error-fg: hsl(8, 88%, 37%);
+  /* Slide type colors — each has EXACTLY ONE meaning (type chips, list markers, header strips).
+     NEVER used for chart bars. Black text passes WCAG AA on all 7 (≥7.5:1 verified). */
+  --slide-materi: #60A5FA;
+  --slide-pilihan: #A78BFA;
+  --slide-polling: #FB923C;
+  --slide-awan: #FFD93D;
+  --slide-tanya: #FF8FCB;
+  --slide-kelompok: #2DD4BF;
+  --slide-kuis: #B8F25B;
+}
+
+@layer base {
+  body {
+    font-weight: var(--font-weight-base);
+    color: var(--foreground);
+    background-color: var(--background);
+    background-image: radial-gradient(circle, hsl(46, 55%, 78%) 1.5px, transparent 0);
+    background-size: 24px 24px;
+    color-scheme: light;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--font-weight-heading);
+  }
+
+  /* Scale: buttons min-height 40px; on mobile/touch targets 48px via explicit class */
+  [data-slot="button"] {
+    min-height: 40px;
+    font-weight: 700;
+  }
+
+  /* Disabled buttons: clear gray state, never a washed-out accent color.
+     WCAG exempts disabled controls from contrast requirements (SC 1.4.3). */
+  [data-slot="button"]:disabled,
+  [data-slot="button"][data-disabled="true"] {
+    opacity: 1;
+    background-color: #e5e7eb;
+    color: #4b5563;
+    box-shadow: none;
+    border-color: #9ca3af;
+  }
+
+  /* Success/correct fill — mint with black text */
+  .bg-success {
+    background-color: var(--success);
+    color: var(--success-foreground);
+  }
+}
+  body, .scrollbar {
+    --sb-track-color: #ffffff;
+    --sb-thumb-color: #000000;
+}
+  .scrollbar::-webkit-scrollbar {
+    width: 16px;
+}
+  .scrollbar::-webkit-scrollbar-track {
+    background: var(--sb-track-color);
+}
+  .scrollbar::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb-color);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .scrollbar {
+    scrollbar-color: var(--sb-thumb-color) var(--sb-track-color);
+  }
+}
