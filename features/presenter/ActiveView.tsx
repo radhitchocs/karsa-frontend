@@ -2,11 +2,12 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeftIcon, ChevronRightIcon, EyeIcon, EyeOffIcon, MessageSquareIcon, UsersIcon } from 'lucide-react';
+import { ExternalLinkIcon, PowerIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon, EyeOffIcon, MessageSquareIcon, UsersIcon } from 'lucide-react';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
 import { AppHeader, HeaderTitle } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { labels } from '@/domain/model';
 import { SlidePreview } from '@/features/shared/SlidePreview';
@@ -16,6 +17,7 @@ import { QAPanel } from './QAPanel';
 import { GroupPanel } from './GroupPanel';
 import { QuizPanel } from './QuizPanel';
 import { PancingPanel } from './PancingPanel';
+import { useProjector } from './useProjector';
 import type { SendFn, PresenterView } from './types';
 
 export function ActiveView({
@@ -27,6 +29,7 @@ export function ActiveView({
 }) {
   const router = useRouter();
   const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [qaOpen, setQaOpen] = useState(false);
   const filmstripRef = useRef<HTMLDivElement>(null);
   const activeSlide = view.slides[view.activeSlideIndex];
@@ -36,6 +39,12 @@ export function ActiveView({
   const activityOpen = activity?.status === 'buka';
   const nextSlide = view.slides[view.activeSlideIndex + 1];
   const onlineCount = view.participants.filter((p) => p.online).length;
+  const projector = useProjector(view.sessionId);
+  // "Konten peserta" only changes slides whose results/answers appear on participants' devices.
+  const hideContentApplies = ['pilihan', 'polling', 'awan', 'tanya', 'kuis'].includes(activeSlide?.type ?? '');
+  // Group slide not divided yet: the next slide is blocked until groups exist.
+  const needsDivision = activeSlide?.type === 'kelompok' && view.groups.length === 0;
+  const [groupAttention, setGroupAttention] = useState(0);
 
   // B8: find tanya slides for persistent Q&A panel
   const tanyaSlides = view.slides.filter((s) => s.type === 'tanya');
@@ -69,23 +78,24 @@ export function ActiveView({
         center={
           <HeaderTitle
             title={view.title}
-            aside={<Badge variant="default">{view.paused ? 'Dijeda' : 'Aktif'}</Badge>}
+            aside={<SessionStatusBadge paused={view.paused} />}
           />
         }
         right={
           <>
             <span className="flex items-center gap-1 whitespace-nowrap text-sm text-foreground/70">
               <UsersIcon className="size-4" />
-              {onlineCount}/{view.participants.length} online
+              {onlineCount}/{view.participants.length} terhubung
             </span>
-            <Button
-              variant="neutral"
-              size="sm"
-              className="text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-black"
-              onClick={() => send({ type: 'session.end' })}
-            >
-              Tutup Sesi
-            </Button>
+            <Tooltip disableHoverablePopup>
+              <TooltipTrigger
+                render={<Button variant="neutral" size="sm" onClick={projector.open} disabled={!projector.ready} />}
+              >
+                <ExternalLinkIcon />
+                Buka Proyektor
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="pointer-events-none">Buka layar proyektor di tab baru</TooltipContent>
+            </Tooltip>
           </>
         }
       />
@@ -137,7 +147,7 @@ export function ActiveView({
           {!activeSlide ? (
             <p className="text-foreground/60">Pilih slide di bawah.</p>
           ) : activeSlide.type === 'kuis' ? (
-            <QuizPanel view={view} send={send} />
+            <QuizPanel view={view} send={send} onRequestEnd={() => setShowEndConfirm(true)} />
           ) : activeSlide.type === 'materi' ? (
             <div className="max-w-2xl mx-auto flex flex-col gap-4">
               <div>
@@ -163,7 +173,7 @@ export function ActiveView({
                 <Badge className="mb-2">{labels[activeSlide.type]}</Badge>
                 <h2 className="text-xl font-bold">{activeSlide.title}</h2>
               </div>
-              <GroupPanel view={view} slide={activeSlide} send={send} />
+              <GroupPanel view={view} slide={activeSlide} send={send} attention={groupAttention} />
             </div>
           ) : activeSlide.type === 'pancing' ? (
             <div className="max-w-2xl mx-auto flex flex-col gap-4">
@@ -205,19 +215,36 @@ export function ActiveView({
                 Lanjutkan Sesi
               </Button>
             )}
-            {/* B10: hideContent toggle — label shows current state */}
-            <Button
-              variant="neutral"
-              size="sm"
-              className="w-full justify-start"
-              onClick={() => send({ type: 'session.toggleHideContent' })}
-            >
-              {view.hideContent ? (
-                <><EyeOffIcon className="size-4 mr-1" />Konten peserta: Sembunyikan</>
-              ) : (
-                <><EyeIcon className="size-4 mr-1" />Konten peserta: Tampilkan</>
-              )}
-            </Button>
+            {/* B10: hideContent toggle — label shows current state. Only affects slides that show
+                participant-side results, so it's disabled (with an explanation) everywhere else. */}
+            {(() => {
+              const toggle = (
+                <Button
+                  variant="neutral"
+                  size="sm"
+                  className="w-full justify-start"
+                  disabled={!hideContentApplies}
+                  onClick={() => send({ type: 'session.toggleHideContent' })}
+                >
+                  {view.hideContent ? (
+                    <><EyeOffIcon className="size-4 mr-1" />Konten peserta: Sembunyikan</>
+                  ) : (
+                    <><EyeIcon className="size-4 mr-1" />Konten peserta: Tampilkan</>
+                  )}
+                </Button>
+              );
+              if (hideContentApplies) return toggle;
+              return (
+                <Tooltip disableHoverablePopup>
+                  <TooltipTrigger render={<div className="cursor-default [&_button]:pointer-events-none" />}>
+                    {toggle}
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="pointer-events-none max-w-60">
+                    Tidak tersedia untuk slide {labels[activeSlide.type]} — slide ini tidak menampilkan konten peserta.
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })()}
           </section>
 
           <section className="flex flex-col gap-2">
@@ -259,9 +286,11 @@ export function ActiveView({
               <Button
                 size="sm"
                 disabled={view.activeSlideIndex >= view.slides.length - 1 || activityOpen}
-                onClick={() =>
-                  send({ type: 'slide.activate', slideIndex: view.activeSlideIndex + 1 })
-                }
+                onClick={() => {
+                  // Moving past an undivided group slide is blocked server-side; point at the fix instead.
+                  if (needsDivision) return setGroupAttention((n) => n + 1);
+                  send({ type: 'slide.activate', slideIndex: view.activeSlideIndex + 1 });
+                }}
               >
                 Berikutnya
                 <ChevronRightIcon className="size-4 ml-1" />
@@ -270,8 +299,22 @@ export function ActiveView({
             {activityOpen && (
               <p className="text-xs text-foreground/60">Tutup aktivitas dulu untuk pindah slide.</p>
             )}
+            {needsDivision && (
+              <p className={`text-xs ${groupAttention > 0 ? 'font-semibold text-[var(--error-fg)]' : 'text-foreground/60'}`}>
+                Bagikan kelompok dulu untuk lanjut ke slide berikutnya.
+              </p>
+            )}
           </section>
 
+          {/* End session lives at the bottom of the panel (not the navbar) and asks first: it can't be undone. */}
+          <Button
+            variant="neutral"
+            className="mt-auto w-full text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-black"
+            onClick={() => setShowEndConfirm(true)}
+          >
+            <PowerIcon />
+            Tutup Sesi
+          </Button>
         </section>
       </div>
 
@@ -334,6 +377,46 @@ export function ActiveView({
           </div>
         </div>
       </aside>
+
+      <Dialog open={showEndConfirm} onOpenChange={setShowEndConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tutup sesi?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-foreground/70">
+            Sesi berakhir untuk semua peserta dan tidak bisa dilanjutkan. Hasilnya tetap tersimpan di tab Hasil.
+          </p>
+          <DialogFooter>
+            <DialogClose render={<Button variant="neutral" size="sm" />}>Batal</DialogClose>
+            <Button
+              size="sm"
+              className="border-2 border-border bg-[var(--error)] text-black hover:bg-[var(--error)]/90"
+              onClick={() => {
+                setShowEndConfirm(false);
+                send({ type: 'session.end' });
+              }}
+            >
+              Tutup Sesi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
+  );
+}
+
+/** Live status next to the title: green "Aktif" with a pulsing dot, or yellow "Dijeda" when paused. */
+function SessionStatusBadge({ paused }: { paused: boolean }) {
+  const color = paused ? 'bg-[#FFD93D]' : 'bg-[#34D399]';
+  return (
+    <span
+      className={`relative inline-flex items-center rounded-full border-2 border-border px-2.5 py-0.5 text-xs font-bold ${color}`}
+    >
+      {paused ? 'Dijeda' : 'Aktif'}
+      <span className="absolute -right-1 -top-1 flex size-2.5" aria-hidden="true">
+        {!paused && <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#34D399] opacity-75" />}
+        <span className={`relative inline-flex size-2.5 rounded-full border border-border ${color}`} />
+      </span>
+    </span>
   );
 }

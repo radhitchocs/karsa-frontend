@@ -8,6 +8,7 @@ import { WordCloud } from './WordCloud';
 import { PancingView } from './PancingView';
 import { QnaView } from './QnaView';
 import { MateriSlide } from '@/features/shared/MateriSlide';
+import { LeaderboardList } from '@/features/shared/LeaderboardList';
 import { labels } from '@/domain/model';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
 import type { ProjectorView } from '@/contracts/views';
@@ -27,20 +28,19 @@ export function ProjectorActiveView({ view }: { view: ProjectorView }) {
   // ── Leaderboard ──────────────────────────────────────────────────────
   if (lb) {
     return (
-      <div className="flex flex-col items-center justify-center gap-6 h-full p-8">
-        <h2 className="text-5xl font-black flex items-center gap-3"><Trophy className="size-12" strokeWidth={2.5} /> Papan Peringkat</h2>
-        <div className="flex flex-col gap-3 w-full max-w-2xl">
-          {lb.entries.map((e) => (
-            <div
-              key={e.ownerId}
-              className="flex items-center gap-4 px-6 py-3 rounded border-2 border-black bg-white shadow-[4px_4px_0_0_#000]"
-            >
-              <span className="text-3xl font-black w-12 text-center">#{e.rank}</span>
-              <span className="flex-1 text-2xl font-bold">{e.ownerLabel}</span>
-              <span className="text-2xl font-black">{e.totalScore}</span>
-            </div>
-          ))}
+      <div className="flex h-full flex-col justify-center gap-6 p-8">
+        <div className="flex shrink-0 items-center justify-between">
+          <span
+            className="inline-flex items-center rounded-base border-2 border-black px-4 py-1 text-lg font-bold shadow-[2px_2px_0_0_#000]"
+            style={{ backgroundColor: SLIDE_COLOR.kuis }}
+          >
+            {labels.kuis}
+          </span>
         </div>
+        <h2 className="flex items-center gap-4 font-black leading-tight" style={{ fontSize: 'clamp(2.5rem, 4vw, 4rem)' }}>
+          <Trophy className="size-14" strokeWidth={2.5} /> Papan Peringkat
+        </h2>
+        <LeaderboardList entries={lb.entries} size="lg" />
       </div>
     );
   }
@@ -61,9 +61,15 @@ export function ProjectorActiveView({ view }: { view: ProjectorView }) {
           >
             Soal {aq.index + 1} / {aq.total}
           </span>
-          <span className={`text-5xl font-black tabular-nums ${!aq.closed && remaining <= 5 ? 'text-[var(--error)]' : ''}`}>
-            {aq.closed ? '—' : `${remaining}s`}
-          </span>
+          {aq.closed ? (
+            <span className="rounded-full border-2 border-black bg-[#FFD93D] px-5 py-1 text-2xl font-bold shadow-[2px_2px_0_0_#000]">
+              Waktu habis
+            </span>
+          ) : (
+            <span className={`text-5xl font-black tabular-nums ${remaining <= 5 ? 'text-[var(--error)]' : ''}`}>
+              {remaining}s
+            </span>
+          )}
         </div>
         {!aq.closed && <Progress value={pct} className="h-3" />}
         <h2 className="font-bold leading-tight" style={{ fontSize: 'clamp(2.5rem, 4vw, 4rem)' }}>{aq.title}</h2>
@@ -140,19 +146,41 @@ export function ProjectorActiveView({ view }: { view: ProjectorView }) {
   // ── Group slide ─────────────────────────────────────────────────────────
   if (slide.type === 'kelompok') {
     return (
-      <div className="flex flex-col gap-6 h-full p-8 justify-center items-center">
-        <h2 className="text-4xl font-bold">{slide.title}</h2>
+      // Same frame as the other slides: type badge + count on top, big title, content below.
+      <div className="flex h-full flex-col justify-center gap-4 p-8">
+        <div className="flex shrink-0 items-center justify-between">
+          <span
+            className="inline-flex items-center rounded-base border-2 border-black px-4 py-1 text-lg font-bold shadow-[2px_2px_0_0_#000]"
+            style={{ backgroundColor: SLIDE_COLOR.kelompok }}
+          >
+            {labels.kelompok}
+          </span>
+          <span className="text-xl font-semibold text-foreground/60">
+            {view.groups.length > 0 ? `${view.groups.length} kelompok` : `${view.participantCount} peserta`}
+          </span>
+        </div>
+        <h2 className="shrink-0 font-bold leading-tight" style={{ fontSize: 'clamp(2.5rem, 4vw, 4rem)' }}>
+          {slide.title}
+        </h2>
         {view.groups.length === 0 ? (
-          <p className="text-2xl text-foreground/70">Menunggu pembagian kelompok…</p>
+          <p className="flex items-center gap-3 pt-2 text-2xl text-foreground/70">
+            <span className="relative flex size-3.5" aria-hidden="true">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-main opacity-75" />
+              <span className="relative inline-flex size-3.5 rounded-full bg-main" />
+            </span>
+            Menunggu pembagian kelompok…
+          </p>
         ) : (
-          <div className="flex flex-wrap gap-4 justify-center">
+          <div className="grid grid-cols-4 gap-4 pt-2">
             {view.groups.map((g) => (
               <div
                 key={g.number}
-                className="bg-white border-2 border-black rounded shadow-[4px_4px_0_0_#000] px-8 py-6 text-center"
+                className="overflow-hidden rounded-base border-2 border-black bg-white shadow-[4px_4px_0_0_#000]"
               >
-                <p className="text-3xl font-black">Kelompok {g.number}</p>
-                <p className="text-xl text-foreground/60 mt-1">{g.memberCount} anggota</p>
+                <p className="border-b-2 border-black px-4 py-2 text-2xl font-black" style={{ backgroundColor: SLIDE_COLOR.kelompok }}>
+                  Kelompok {g.number}
+                </p>
+                <p className="px-4 py-3 text-xl text-foreground/70">{g.memberCount} anggota</p>
               </div>
             ))}
           </div>
@@ -219,7 +247,7 @@ export function ProjectorActiveView({ view }: { view: ProjectorView }) {
         {prog && (
           <span className={`text-xl font-semibold text-foreground/60 ${showBarChart ? 'shrink-0' : ''}`}>
             {prog.wordsReceived !== undefined
-              ? `${prog.wordsReceived} kata`
+              ? `${prog.received} peserta · ${prog.wordsReceived} kata`
               : `${prog.received} / ${prog.total} respon`}
           </span>
         )}
@@ -238,11 +266,21 @@ export function ProjectorActiveView({ view }: { view: ProjectorView }) {
         <p className="text-2xl text-foreground/70 shrink-0">{slide.body}</p>
       )}
 
-      {prog && !showBarChart && slide.type !== 'awan' && (
-        <Progress
-          value={prog.total > 0 ? (prog.received / prog.total) * 100 : 0}
-          className="h-3 shrink-0"
-        />
+      {/* Options on the big screen while answering, so the room can read them (results replace them) */}
+      {!showBarChart && (slide.type === 'pilihan' || slide.type === 'polling') && slide.options.length > 0 && (
+        <div className="grid shrink-0 grid-cols-2 gap-4 pt-2">
+          {slide.options.map((opt, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-4 rounded-base border-2 border-black bg-white px-5 py-4 text-2xl font-semibold shadow-[4px_4px_0_0_#000]"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-black text-lg font-black">
+                {String.fromCharCode(65 + i)}
+              </span>
+              <span className="min-w-0">{opt}</span>
+            </div>
+          ))}
+        </div>
       )}
 
       {results && results.type === 'awan' && (

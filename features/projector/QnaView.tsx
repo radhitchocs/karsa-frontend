@@ -45,8 +45,9 @@ export function QnaView({ title, body, label, color, questions, totalReceived }:
   }, [hasActive]);
 
   return (
-    <div className="flex flex-col pt-[16vh] gap-4 h-full p-8">
-      <div className="flex items-center justify-center gap-4 shrink-0">
+    // Same frame as the other slides: centered vertically, badge far left, count far right.
+    <div className="flex h-full flex-col justify-center gap-4 p-8">
+      <div className="flex shrink-0 items-center gap-4">
         <span
           className="inline-flex items-center rounded-base border-2 border-black px-4 py-1 text-lg font-bold shadow-[2px_2px_0_0_#000] shrink-0"
           style={{ backgroundColor: color }}
@@ -54,18 +55,18 @@ export function QnaView({ title, body, label, color, questions, totalReceived }:
           {label}
         </span>
         {active && (
-          <h2 ref={titleRef} className="text-lg font-medium truncate max-w-xs">
+          <h2 ref={titleRef} className="min-w-0 truncate text-lg font-medium">
             {title}
           </h2>
         )}
-        <span className="text-xl font-semibold text-foreground/60 shrink-0">
+        <span className="ml-auto shrink-0 text-xl font-semibold text-foreground/60">
           {totalReceived} pertanyaan
         </span>
       </div>
 
-      {/* Title and question share one grid cell at a fixed top offset, so the
-          big text always starts at the same spot and the header never shifts */}
-      <div className="flex-1 grid content-start ">
+      {/* Title and question share one grid cell, so the big text always starts
+          at the same spot and the header never shifts */}
+      <div className="grid shrink-0">
         <div
           className={`[grid-area:1/1] flex flex-col gap-4 ${active ? 'invisible' : ''}`}
           aria-hidden={active ? true : undefined}

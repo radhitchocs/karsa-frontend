@@ -7,33 +7,20 @@ import { AppHeader, HeaderTitle } from '@/components/AppHeader';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { apiFetch } from '@/lib/api';
+import { useProjector } from './useProjector';
 import type { SendFn, PresenterView } from './types';
 
 export function LobbyView({ view, send }: { view: PresenterView; send: SendFn }) {
   const router = useRouter();
   const [joinUrl, setJoinUrl] = useState('');
   const [displayBase, setDisplayBase] = useState(process.env.NEXT_PUBLIC_JOIN_DISPLAY_URL ?? '');
-  const [projectorToken, setProjectorToken] = useState<string | null>(null);
 
   useEffect(() => {
     setJoinUrl(`${window.location.origin}/join?code=${view.code}`);
     if (!process.env.NEXT_PUBLIC_JOIN_DISPLAY_URL) setDisplayBase(window.location.host);
   }, [view.code]);
 
-  useEffect(() => {
-    apiFetch<{ token: string }>(`/api/sessions/${view.sessionId}/projector-token`)
-      .then((r) => setProjectorToken(r.token))
-      .catch(console.error);
-  }, [view.sessionId]);
-
-  function openProjector() {
-    if (!projectorToken) return;
-    window.open(
-      `${window.location.origin}/session/${view.sessionId}/projector?token=${projectorToken}`,
-      '_blank',
-    );
-  }
+  const projector = useProjector(view.sessionId);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -42,7 +29,7 @@ export function LobbyView({ view, send }: { view: PresenterView; send: SendFn })
         center={<HeaderTitle title={view.title} />}
         right={
           <>
-            <Button variant="neutral" size="sm" onClick={openProjector} disabled={!projectorToken}>
+            <Button variant="neutral" size="sm" onClick={projector.open} disabled={!projector.ready}>
               <ExternalLinkIcon />
               Buka Proyektor
             </Button>
