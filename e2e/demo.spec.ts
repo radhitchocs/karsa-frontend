@@ -211,7 +211,7 @@ test('PRD §9 demo: full flow materi→pilihan→kelompok→awan→tanya→kuis�
   await ss(page, 'slide-kuis-q1-auto-closed');
 
   // AC31: SimulationControls "Lewati" force-closes Q2 before deadline
-  await page.getByRole('button', { name: 'Soal Berikutnya →' }).click();
+  await page.getByRole('button', { name: 'Soal Berikutnya' }).click();
   await ss(page, 'slide-kuis-q2-open');
   await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Jawab Cepat' }).click();
   await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Lewati' }).click();
@@ -226,7 +226,7 @@ test('PRD §9 demo: full flow materi→pilihan→kelompok→awan→tanya→kuis�
   await ss(page, 'slide-kuis-q2-results-revealed');
 
   // Q3
-  await page.getByRole('button', { name: 'Soal Berikutnya →' }).click();
+  await page.getByRole('button', { name: 'Soal Berikutnya' }).click();
   await ss(page, 'slide-kuis-q3-open');
   await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Jawab Cepat' }).click();
   await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Lewati' }).click();
@@ -239,7 +239,7 @@ test('PRD §9 demo: full flow materi→pilihan→kelompok→awan→tanya→kuis�
   await ss(page, 'slide-kuis-selesai');
 
   // Reveal leaderboard
-  await page.getByRole('button', { name: 'Tampilkan Leaderboard' }).click();
+  await page.getByRole('button', { name: 'Tampilkan Papan Peringkat' }).click();
   await ss(page, 'slide-kuis-leaderboard-revealed');
 
   // Projector sees leaderboard top-5 (no own-rank row for projector)
@@ -248,7 +248,9 @@ test('PRD §9 demo: full flow materi→pilihan→kelompok→awan→tanya→kuis�
   await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Presenter' }).click();
 
   // ── 11. End session ───────────────────────────────────────────────────────
-  await page.getByRole('button', { name: 'Akhiri Sesi' }).click();
+  // Ending the session now asks for confirmation first
+  await page.getByRole('button', { name: 'Tutup Sesi' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Tutup Sesi' }).click();
   await ss(page, 'session-ended');
   await expect(page.getByText(/selesai|summary|berakhir/i)).toBeVisible({ timeout: 8_000 });
 });

@@ -385,12 +385,14 @@ test('full presenter + participant flow', async ({ page }) => {
   await screenshot(page, '24-quiz-finished');
 
   // ── Leaderboard (S16) ──────────────────────────────────────────────────────
-  await page.getByRole('button', { name: 'Tampilkan Leaderboard' }).click();
+  await page.getByRole('button', { name: 'Tampilkan Papan Peringkat' }).click();
   await page.waitForSelector('text=Leaderboard', { timeout: 5_000 });
   await screenshot(page, '25-leaderboard');
 
   // ── End session + Summary (S12) ────────────────────────────────────────────
-  await page.getByRole('button', { name: 'Akhiri Sesi' }).click();
+  // Ending the session asks for confirmation first
+  await page.getByRole('button', { name: 'Tutup Sesi' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Tutup Sesi' }).click();
   await page.waitForSelector('text=Sesi Selesai', { timeout: 10_000 });
   await screenshot(page, '26-summary');
   await expect(page.getByText('Sesi Selesai')).toBeVisible();

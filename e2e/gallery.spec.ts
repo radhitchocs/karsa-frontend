@@ -280,15 +280,15 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText(`Soal ${i + 1} /`).first()).toBeVisible({ timeout: 10_000 });
       await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Lewati' }).click();
       if (i < totalQuestions - 1) {
-        await expect(page.getByRole('button', { name: 'Soal Berikutnya →' }).first()).toBeVisible({ timeout: 10_000 });
-        await page.getByRole('button', { name: 'Soal Berikutnya →' }).first().click();
+        await expect(page.getByRole('button', { name: 'Soal Berikutnya' }).first()).toBeVisible({ timeout: 10_000 });
+        await page.getByRole('button', { name: 'Soal Berikutnya' }).first().click();
       }
     }
     // After last question: "Selesaikan Kuis" → click → "Tampilkan Leaderboard"
     await expect(page.getByRole('button', { name: 'Selesaikan Kuis' }).first()).toBeVisible({ timeout: 10_000 });
     await page.getByRole('button', { name: 'Selesaikan Kuis' }).first().click();
-    await expect(page.getByRole('button', { name: 'Tampilkan Leaderboard' }).first()).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: 'Tampilkan Leaderboard' }).first().click();
+    await expect(page.getByRole('button', { name: 'Tampilkan Papan Peringkat' }).first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Tampilkan Papan Peringkat' }).first().click();
 
     await page.locator('[aria-label="SimulationControls"] button', { hasText: 'Proyektor' }).click();
     await expect(page.getByText('Papan Peringkat').first()).toBeVisible({ timeout: 5_000 });

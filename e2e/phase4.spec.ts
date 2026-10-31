@@ -235,8 +235,8 @@ test('participant + projector POVs — all slide types', async () => {
 
     // B6 item 6: Reveal WITH hideContent=ON (default) — participant must see confirmation, NOT correct answer
     await presPage.getByRole('button', { name: 'Tampilkan Hasil' }).click();
-    // Wait for reveal to reach participant (button becomes disabled once activity.visible=true)
-    await presPage.waitForSelector('button[disabled]:has-text("Tampilkan Hasil")', { timeout: 5_000 });
+    // Wait for reveal to reach participant (status pill switches to "Hasil ditampilkan")
+    await presPage.waitForSelector('text=Hasil ditampilkan', { timeout: 5_000 });
     // Participant sees confirmation, not correct answer
     await pPages[0].waitForSelector('text=Jawabanmu sudah masuk', { timeout: 8_000 });
     await expect(pPages[0].locator('[aria-label="jawaban benar"]')).not.toBeVisible();
@@ -527,7 +527,7 @@ test('participant + projector POVs — all slide types', async () => {
     await presPage.waitForSelector('text=Kuis Selesai', { timeout: 5_000 });
 
     // Leaderboard
-    await presPage.getByRole('button', { name: 'Tampilkan Leaderboard' }).click();
+    await presPage.getByRole('button', { name: 'Tampilkan Papan Peringkat' }).click();
     await presPage.waitForSelector('text=Leaderboard', { timeout: 5_000 });
 
     await pPages[0].waitForSelector('text=Kuis Selesai!', { timeout: 10_000 });
@@ -553,7 +553,9 @@ test('participant + projector POVs — all slide types', async () => {
     await pPages[2].waitForSelector('text=Kuis Selesai!', { timeout: 10_000 });
 
     // ── End session ────────────────────────────────────────────────────────
-    await presPage.getByRole('button', { name: 'Akhiri Sesi' }).click();
+    // Ending the session asks for confirmation first
+    await presPage.getByRole('button', { name: 'Tutup Sesi' }).first().click();
+    await presPage.getByRole('dialog').getByRole('button', { name: 'Tutup Sesi' }).click();
     await presPage.waitForSelector('text=Sesi Selesai', { timeout: 10_000 });
 
     await pPages[0].waitForSelector('text=Sesi selesai', { timeout: 10_000 });

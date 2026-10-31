@@ -145,9 +145,9 @@ test('bots simulate responses, leaderboard includes all, summary shows label', a
   // Finish + reveal leaderboard
   await page.getByRole('button', { name: 'Selesaikan Kuis' }).click();
   await page.waitForSelector('text=Kuis Selesai', { timeout: 5_000 });
-  await page.getByRole('button', { name: 'Tampilkan Leaderboard' }).click();
-  // Wait for LeaderboardView which has "Akhiri Sesi" button (not present in finished state)
-  await page.waitForSelector('button:has-text("Akhiri Sesi")', { timeout: 8_000 });
+  await page.getByRole('button', { name: 'Tampilkan Papan Peringkat' }).click();
+  // Wait for the leaderboard stage (its status pill only appears once revealed)
+  await page.waitForSelector('text=Ditampilkan di proyektor', { timeout: 8_000 });
   await page.screenshot({ path: path.join(SCREENSHOTS, 'bots-04-leaderboard.png') });
 
   // Verify leaderboard contains at least some bot names
@@ -168,7 +168,9 @@ test('bots simulate responses, leaderboard includes all, summary shows label', a
   expect(partNames.includes('RealUser'), 'RealUser is a participant').toBe(true);
 
   // ── End session → check summary shows simulated-data-label ─────────────
-  await page.getByRole('button', { name: 'Akhiri Sesi' }).click();
+  // Ending the session asks for confirmation first
+  await page.getByRole('button', { name: 'Tutup Sesi' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Tutup Sesi' }).click();
   await page.waitForSelector('[data-testid="simulated-data-label"]', { timeout: 8_000 });
   await page.screenshot({ path: path.join(SCREENSHOTS, 'bots-05-summary-label.png') });
 
