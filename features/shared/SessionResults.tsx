@@ -8,7 +8,7 @@ import { getToken } from '@/lib/auth';
 import { type Kind, type Slide, labels } from '@/domain/model';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
 
-type SessionResult = {
+export type SessionResult = {
   id: string;
   code: string;
   status: string;
@@ -36,12 +36,12 @@ type SessionResult = {
 type SlideResult = SessionResult['slides'][number];
 
 /** Slide types that produce results; content-only types (materi, kelompok, pancing) are skipped. */
-const RESULT_TYPES = new Set(['pilihan', 'polling', 'awan', 'tanya', 'kuis']);
+export const RESULT_TYPES = new Set(['pilihan', 'polling', 'awan', 'tanya', 'kuis']);
 
 /** Leaderboard medal fills (PRD §17: never reused for other meanings). */
 const MEDALS = ['#FBBF24', '#CBD5E1', '#D97706'];
 
-const cardClass =
+export const cardClass =
   'rounded-base border-2 border-border bg-secondary-background shadow-[4px_4px_0_0_var(--border)]';
 
 const fmtDate = (iso: string) =>
@@ -153,7 +153,7 @@ export function ResultsArea({ presentationId, slides }: { presentationId: string
   );
 }
 
-function SessionSummary({ session }: { session: SessionResult }) {
+export function SessionSummary({ session }: { session: SessionResult }) {
   const interactive = session.slides.filter((s) => RESULT_TYPES.has(s.type));
   const totalResponses = interactive.reduce(
     (sum, s) => sum + (s.type === 'tanya' ? s.questions.length : s.type === 'kuis' ? 0 : s.responseCount),
@@ -193,7 +193,7 @@ function SessionSummary({ session }: { session: SessionResult }) {
   );
 }
 
-function ResultCard({
+export function ResultCard({
   result,
   slide,
   number,

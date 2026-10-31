@@ -1,94 +1,123 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { TrophyIcon } from 'lucide-react';
+import { HomeIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { labels } from '@/domain/model';
+import { AppHeader, HeaderTitle } from '@/components/AppHeader';
+import {
+  RESULT_TYPES,
+  ResultCard,
+  SessionSummary,
+  cardClass,
+  type SessionResult,
+} from '@/features/shared/SessionResults';
 import type { PresenterView } from './types';
+
+/**
+ * Map the live presenter view onto the saved-results shape so the end-of-session
+ * screen reuses exactly the same cards as the editor's Hasil tab.
+ */
+function toSessionResult(view: PresenterView): SessionResult {
+  const nameOf = (ownerId: string) => {
+    const group = view.groups.find((g) => g.id === ownerId);
+    if (group) return `Kelompok ${group.number}`;
+    return view.participants.find((p) => p.id === ownerId)?.name ?? null;
+  };
+  const quizSlide = view.slides.find((s) => s.type === 'kuis');
+  const questionIds = quizSlide?.quizQuestions?.map((q) => q.id) ?? [];
+
+  return {
+    id: view.sessionId,
+    code: view.code,
+    status: 'ENDED',
+    // The live view carries no timestamps; the session has just ended.
+    createdAt: new Date().toISOString(),
+    endedAt: null,
+    participantCount: view.participants.length,
+    slides: view.slides.map((s) => {
+      const responses = view.responses.filter((r) => r.slideId === s.id);
+      const questions = view.questions.filter((q) => q.slideId === s.id);
+      return {
+        id: s.id,
+        type: s.type,
+        title: s.title,
+        responseCount: s.type === 'tanya' ? questions.length : responses.length,
+        responses: responses.map((r) => ({ value: r.value, ownerLabel: nameOf(r.ownerId) })),
+        questions: questions.map((q) => ({ text: q.text, visible: q.visible, answered: q.answered })),
+      };
+    }),
+    quizScores: (view.quiz?.runs ?? []).flatMap((run) =>
+      run.answers.map((a) => ({
+        questionRunId: run.questionId,
+        questionIndex: Math.max(0, questionIds.indexOf(run.questionId)),
+        ownerLabel: nameOf(a.ownerId),
+        optionIndex: a.option,
+        isCorrect: a.correct,
+        score: a.score,
+      })),
+    ),
+  };
+}
 
 export function SummaryView({ view }: { view: PresenterView }) {
   const router = useRouter();
+  const session = useMemo(() => toSessionResult(view), [view]);
+  const results = session.slides.filter((s) => RESULT_TYPES.has(s.type));
 
   return (
-    <main className="flex flex-col min-h-full">
-      <header className="border-b-2 border-border bg-secondary-background px-4 py-3">
-        <h1 className="font-bold">Sesi Selesai — {view.title}</h1>
-      </header>
-      <div className="flex-1 p-6 max-w-2xl mx-auto w-full flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">Ringkasan</h2>
-          <Button variant="neutral" onClick={() => router.push('/')}>
+    <main className="flex min-h-full flex-col">
+      <AppHeader
+        onHome={() => router.push('/')}
+        center={
+          <HeaderTitle
+            title={view.title}
+            aside={
+              <span className="rounded-full border-2 border-border bg-secondary-background px-2.5 py-0.5 text-xs font-bold">
+                Selesai
+              </span>
+            }
+          />
+        }
+        right={
+          <Button variant="neutral" size="sm" onClick={() => router.push('/')}>
+            <HomeIcon />
             Kembali ke Beranda
           </Button>
-        </div>
+        }
+      />
 
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 p-6">
         {view.hasSimulatedData && (
           <div
-            className="rounded border-2 border-border bg-secondary-background px-4 py-2 text-sm font-medium"
+            className="rounded-base border-2 border-border bg-[#FFD93D]/50 px-4 py-2 text-sm font-medium"
             data-testid="simulated-data-label"
           >
             Berisi data simulasi — bukan hasil sesi nyata
           </div>
         )}
 
-        {view.slides.map((s) => {
-          if (s.type === 'materi' || s.type === 'kuis') return null;
-          const rs = view.responses.filter((r) => r.slideId === s.id);
-          return (
-            <Card key={s.id}>
-              <CardHeader>
-                <Badge className="self-start mb-1">{labels[s.type]}</Badge>
-                <CardTitle className="text-base">{s.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-foreground/60">{rs.length} respon diterima.</p>
-                {(s.type === 'pilihan' || s.type === 'polling') && rs.length > 0 && (
-                  <div className="flex flex-col gap-1 mt-2">
-                    {s.options.map((opt, i) => {
-                      const count = rs.filter((r) => r.value[0] === String(i)).length;
-                      const pct = Math.round((count / rs.length) * 100);
-                      return (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          <span className="w-6 font-bold">{String.fromCharCode(65 + i)}</span>
-                          <Progress value={pct} className="flex-1" />
-                          <span className="w-20 text-right">
-                            {count} ({pct}%)
-                          </span>
-                          {s.type === 'pilihan' && s.correct?.includes(i) && (
-                            <Badge className="border-[#34D399] bg-secondary-background text-xs">Benar</Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+        <SessionSummary session={session} />
 
-        {view.leaderboard && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrophyIcon className="size-5" />
-                Hasil Kuis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              {view.leaderboard.entries.map((e) => (
-                <div key={e.ownerId} className="flex items-center gap-3 text-sm">
-                  <span className="w-8 font-bold text-center">#{e.rank}</span>
-                  <span className="flex-1">{e.ownerLabel}</span>
-                  <span className="font-bold">{e.totalScore} pts</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        {results.length === 0 ? (
+          <p className={`${cardClass} p-6 text-center text-sm text-foreground/70`}>
+            Tidak ada slide interaktif di sesi ini.
+          </p>
+        ) : (
+          results.map((s, i) => (
+            <ResultCard
+              key={s.id}
+              result={s}
+              slide={view.slides.find((x) => x.id === s.id)}
+              number={i + 1}
+              session={session}
+            />
+          ))
         )}
+
+        <p className="text-center text-xs text-foreground/60">
+          Hasil sesi ini juga tersimpan di tab <strong>Hasil</strong> pada editor presentasi.
+        </p>
       </div>
     </main>
   );

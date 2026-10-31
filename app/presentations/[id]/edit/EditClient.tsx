@@ -67,7 +67,7 @@ import {
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
 import { AppHeader } from '@/components/AppHeader';
-import { ResultsArea } from './ResultsArea';
+import { ResultsArea } from '@/features/shared/SessionResults';
 import type { Editor } from '@tiptap/react';
 import { RichTextField, RichTextToolbar, UnavailableHint, pillBase, pillButton, pillGroup } from './RichTextEditor';
 import { PanelNote, SettingsPanel, SlideCanvas, canvasFrameClass } from './SlideCanvas';

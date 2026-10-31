@@ -10,6 +10,8 @@ import { toast } from '@/components/ui/toast';
 import { ParticipantLobbyView } from '@/features/participant/ParticipantLobbyView';
 import { ParticipantActiveView } from '@/features/participant/ParticipantActiveView';
 import { ConnectionBanner } from '@/features/participant/ConnectionBanner';
+import { ParticipantHeader } from '@/features/participant/ParticipantHeader';
+import { CheckIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { ParticipantView } from '@/contracts/views';
@@ -110,10 +112,20 @@ export function ParticipantClient() {
 
   if (view.status === 'selesai') {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
+      <main className="flex min-h-0 flex-1 flex-col">
         <ConnectionBanner disconnected={disconnected} />
-        <p className="text-xl font-bold">Sesi selesai</p>
-        <p className="text-sm text-foreground/60">Terima kasih sudah berpartisipasi!</p>
+        <ParticipantHeader name={view.name} title={view.title} onExit={() => router.push('/join')} />
+        <div className="flex flex-1 flex-col items-center justify-center p-4">
+          <section className="flex w-full max-w-sm flex-col items-center gap-3 rounded-base border-2 border-border bg-secondary-background px-6 py-8 text-center shadow-[4px_4px_0_0_var(--border)]">
+            <span className="flex size-14 items-center justify-center rounded-full border-2 border-border bg-[#34D399]">
+              <CheckIcon className="size-7" strokeWidth={3} />
+            </span>
+            <p className="text-xl font-black">Sesi selesai</p>
+            <p className="text-sm text-foreground/70">
+              Terima kasih sudah berpartisipasi di <strong className="text-foreground">{view.title}</strong>, {view.name}!
+            </p>
+          </section>
+        </div>
       </main>
     );
   }

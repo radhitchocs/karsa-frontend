@@ -6,6 +6,7 @@ import { io } from 'socket.io-client';
 import { API_BASE } from '@/lib/api';
 import { ProjectorLobbyView } from '@/features/projector/ProjectorLobbyView';
 import { ProjectorActiveView } from '@/features/projector/ProjectorActiveView';
+import { KarsaWordmark } from '@/components/KarsaWordmark';
 import type { ProjectorView } from '@/contracts/views';
 
 function useDisplayBase(): string {
@@ -106,8 +107,12 @@ export function ProjectorClient() {
         {view.status === 'lobi' ? (
           <ProjectorLobbyView view={view} />
         ) : view.status === 'selesai' ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-4xl font-black">Sesi Selesai</p>
+          <div className="flex h-full flex-col items-center justify-center gap-6 p-8 text-center">
+            <KarsaWordmark size="lg" />
+            <p className="font-black leading-tight" style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)' }}>Sesi selesai</p>
+            <p className="text-2xl text-foreground/70">
+              Terima kasih sudah berpartisipasi di <strong className="text-foreground">{view.title}</strong>!
+            </p>
           </div>
         ) : (
           <ProjectorActiveView view={view} />
