@@ -20,6 +20,7 @@ import {
   TrophyIcon,
   ImageIcon,
   BarChart3Icon,
+  PencilIcon,
   FishIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -462,15 +463,34 @@ export function EditClient() {
         }
         right={
           <>
-            {/* Results tab toggle */}
-            <Button
-              variant={activeTab === 'results' ? 'default' : 'neutral'}
-              size="sm"
+            {/* Mode switch: one button showing both modes; clicking anywhere flips Edit <-> Hasil. */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={activeTab === 'results'}
+              aria-label="Tampilkan hasil sesi"
               onClick={() => setActiveTab(activeTab === 'results' ? 'edit' : 'results')}
+              className="relative grid h-10 cursor-pointer grid-cols-2 items-center rounded-base border-2 border-border bg-secondary-background p-0.5 text-sm font-bold shadow-shadow transition-all hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none"
+              data-testid="mode-switch"
             >
-              <BarChart3Icon />
-              Hasil
-            </Button>
+              {/* Sliding highlight behind the active label */}
+              <span
+                aria-hidden="true"
+                className={`absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded-[calc(var(--radius-base)-2px)] bg-main transition-transform duration-200 ease-out ${activeTab === 'results' ? 'translate-x-full' : 'translate-x-0'}`}
+              />
+              {([
+                { tab: 'edit', label: 'Edit', icon: <PencilIcon /> },
+                { tab: 'results', label: 'Hasil', icon: <BarChart3Icon /> },
+              ] as const).map(({ tab, label, icon }) => (
+                <span
+                  key={tab}
+                  className={`relative flex h-full items-center justify-center gap-1.5 px-3 transition-colors [&_svg]:size-4 ${activeTab === tab ? 'text-main-foreground' : 'text-foreground/60'}`}
+                >
+                  {icon}
+                  {label}
+                </span>
+              ))}
+            </button>
             <Button
               size="sm"
               data-testid="mulai-sesi-btn"
