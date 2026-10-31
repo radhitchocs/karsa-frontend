@@ -29,8 +29,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dropzone } from '@/components/ui/dropzone';
 import { NumberStepper } from '@/components/ui/number-stepper';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
@@ -69,6 +67,7 @@ import {
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
 import { AppHeader } from '@/components/AppHeader';
+import { ResultsArea } from './ResultsArea';
 import type { Editor } from '@tiptap/react';
 import { RichTextField, RichTextToolbar, UnavailableHint, pillBase, pillButton, pillGroup } from './RichTextEditor';
 import { PanelNote, SettingsPanel, SlideCanvas, canvasFrameClass } from './SlideCanvas';
@@ -79,31 +78,6 @@ type PresentationDetail = {
   slidesJson: Slide[];
   updatedAt: string;
   version: number;
-};
-
-type SessionResult = {
-  id: string;
-  code: string;
-  status: string;
-  createdAt: string;
-  endedAt: string | null;
-  participantCount: number;
-  slides: Array<{
-    id: string;
-    type: string;
-    title: string;
-    responseCount: number;
-    responses: Array<{ value: unknown; ownerLabel: string | null }>;
-    questions: Array<{ text: string; visible: boolean; answered: boolean }>;
-  }>;
-  quizScores: Array<{
-    questionRunId: string;
-    questionIndex: number;
-    ownerLabel: string | null;
-    optionIndex: number;
-    isCorrect: boolean;
-    score: number;
-  }>;
 };
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
@@ -511,7 +485,7 @@ export function EditClient() {
       />
 
       {activeTab === 'results' ? (
-        <ResultsArea presentationId={id} />
+        <ResultsArea presentationId={id} slides={slides} />
       ) : (
         <div className="flex flex-1 min-h-0 flex-col">
           {/* Slide editor (canvas + form) */}
@@ -743,158 +717,6 @@ export function EditClient() {
         </div>
       )}
     </main>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ResultsArea — C8: past sessions of a presentation
-// ---------------------------------------------------------------------------
-
-function ResultsArea({ presentationId }: { presentationId: string }) {
-  const [activeSession, setActiveSession] = useState<string | null>(null);
-
-  const { data: results, isLoading } = useQuery<SessionResult[]>({
-    queryKey: ['presentation-results', presentationId],
-    queryFn: () => apiFetch<SessionResult[]>(`/api/presentations/${presentationId}/results`),
-    enabled: !!getToken(),
-  });
-
-  useEffect(() => {
-    if (results && results.length > 0 && !activeSession) {
-      setActiveSession(results[0].id);
-    }
-  }, [results, activeSession]);
-
-  if (isLoading) return <div className="flex flex-1 items-center justify-center p-8">Memuat hasil…</div>;
-  if (!results || results.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8 text-foreground/60">
-        Belum ada sesi yang tersimpan.
-      </div>
-    );
-  }
-
-  const session = results.find((s) => s.id === activeSession) ?? results[0];
-
-  return (
-    <div className="flex flex-1 min-h-0">
-      {/* Session tabs */}
-      <aside className="w-48 border-r-2 border-border bg-secondary-background flex flex-col overflow-y-auto p-2 gap-1 shrink-0">
-        <p className="text-xs font-semibold text-foreground/70 px-2 py-1">Sesi Lampau</p>
-        {results.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => setActiveSession(s.id)}
-            className={`text-left px-2 py-2 rounded-base border-2 text-xs transition-colors ${s.id === activeSession ? 'border-foreground shadow-[2px_2px_0_0_#000]' : 'border-transparent hover:border-foreground/20'
-              }`}
-          >
-            <div className="font-semibold">#{s.code}</div>
-            <div className="text-foreground/70">{new Date(s.createdAt).toLocaleDateString('id-ID')}</div>
-            <div className="text-foreground/70">{s.participantCount} peserta</div>
-          </button>
-        ))}
-      </aside>
-
-      {/* Session detail */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-2xl mx-auto flex flex-col gap-6">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold">Sesi #{session.code}</h2>
-            <Badge className={session.status === 'ENDED' ? 'bg-secondary-background border-border' : 'bg-[#34D399] border-black'}>
-              {session.status === 'ENDED' ? 'Selesai' : session.status}
-            </Badge>
-            <span className="text-sm text-foreground/70">
-              {new Date(session.createdAt).toLocaleString('id-ID')}
-            </span>
-          </div>
-
-          {session.slides.map((slide) => (
-            <Card key={slide.id} className="border-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">{slide.title} <span className="text-foreground/60 font-normal">({slide.type})</span></CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                <p className="text-xs text-foreground/60">{slide.responseCount} respons</p>
-
-                {/* Polling/Pilihan: show response breakdown (value is string[] e.g. ["0"]) */}
-                {(slide.type === 'pilihan' || slide.type === 'polling') && slide.responses.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    {Object.entries(
-                      slide.responses.reduce<Record<number, number>>((acc, r) => {
-                        const v = r.value as string[];
-                        const optIdx = Number(Array.isArray(v) ? v[0] : undefined);
-                        if (!isNaN(optIdx)) acc[optIdx] = (acc[optIdx] ?? 0) + 1;
-                        return acc;
-                      }, {}),
-                    ).map(([optIdx, count]) => (
-                      <div key={optIdx} className="flex items-center gap-2 text-xs">
-                        <span className="font-bold w-6">{String.fromCharCode(65 + Number(optIdx))}</span>
-                        <div className="flex-1 bg-foreground/10 rounded h-3 overflow-hidden">
-                          <div
-                            className="h-full bg-main"
-                            style={{ width: `${(count / slide.responseCount) * 100}%` }}
-                          />
-                        </div>
-                        <span className="w-6 text-right">{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Awan kata: value is string[] of words */}
-                {slide.type === 'awan' && slide.responses.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {slide.responses.flatMap((r) => {
-                      const v = r.value as string[];
-                      return Array.isArray(v) ? v : [];
-                    }).map((w, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-cyan-100 border border-cyan-400 rounded text-xs">{w}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Q&A: show questions */}
-                {slide.type === 'tanya' && slide.questions.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    {slide.questions.map((q, i) => (
-                      <div key={i} className="text-xs border border-border rounded p-2">
-                        <p>{q.text}</p>
-                        {q.visible && <span className="text-orange-600 font-medium">Ditampilkan</span>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Quiz scores */}
-          {session.quizScores.length > 0 && (
-            <Card className="border-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Skor Kuis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-foreground/60">{session.quizScores.length} jawaban tercatat</p>
-                <div className="mt-2 text-xs">
-                  {Array.from(new Set(session.quizScores.map((s) => s.ownerLabel))).slice(0, 10).map((ownerLabel) => {
-                    const scores = session.quizScores.filter((s) => s.ownerLabel === ownerLabel);
-                    const total = scores.reduce((s, a) => s + a.score, 0);
-                    const correct = scores.filter((s) => s.isCorrect).length;
-                    return (
-                      <div key={ownerLabel} className="flex justify-between py-0.5 border-b border-border/30">
-                        <span className="truncate max-w-[60%]">{ownerLabel ?? '—'}</span>
-                        <span>{correct}/{scores.length} benar · {total} poin</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
