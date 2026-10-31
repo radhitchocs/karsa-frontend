@@ -40,8 +40,6 @@ import {
 import {
   ContextMenu,
   ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -67,6 +65,7 @@ import {
   quizOrderErrors,
 } from '@/domain/model';
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
+import { SlidePreview } from '@/features/shared/SlidePreview';
 
 type PresentationDetail = {
   id: string;
@@ -167,6 +166,39 @@ function SlideInsertGap({
     </div>
   );
 }
+/** Duplikat / Hapus actions, shared by the slide's ⋯ dropdown and right-click context menu. */
+function SlideMenuItems({
+  testIdPrefix,
+  index,
+  onDuplicate,
+  onDelete,
+}: {
+  testIdPrefix: 'slide' | 'slide-ctx';
+  index: number;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <>
+      <DropdownMenuItem
+        onClick={onDuplicate}
+        className="gap-1.5 px-1.5 py-1 text-xs [&_svg]:size-3 cursor-pointer"
+        data-testid={`${testIdPrefix}-duplicate-${index}`}
+      >
+        <CopyIcon /> Duplikat
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onClick={onDelete}
+        className="gap-1.5 px-1.5 py-1 text-xs [&_svg]:size-3 text-[var(--error-fg)] hover:bg-[var(--error)] cursor-pointer hover:text-white hover:border-border focus:bg-[var(--error)] focus:text-white focus:border-border data-highlighted:bg-[var(--error)] data-highlighted:text-black data-highlighted:border-border"
+        data-testid={`${testIdPrefix}-delete-${index}`}
+      >
+        <Trash2Icon /> Hapus
+      </DropdownMenuItem>
+    </>
+  );
+}
+
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -557,58 +589,51 @@ export function EditClient() {
                               }}
                               onClick={() => setSelectedIndex(i)}
                               style={dragging ? { transform: `translateX(${shift * dragStep}px)` } : undefined}
-                              className={`group relative w-40 shrink-0 flex flex-col gap-1 p-2 rounded-base border-2 cursor-pointer select-none ${dragging ? 'transition-[transform,border-color] duration-150 ease-out' : 'transition-colors'} ${dragging && isDragged
+                              className={`group relative w-40 aspect-video shrink-0 overflow-hidden rounded-base border-2 bg-white cursor-pointer select-none ${dragging ? 'transition-[transform,border-color] duration-150 ease-out' : 'transition-colors'} ${dragging && isDragged
                                 ? 'border-foreground opacity-60 z-10 pointer-events-none'
                                 : i === selectedIndex
                                   ? 'border-foreground shadow-[2px_2px_0_0_#000]'
-                                  : 'border-transparent hover:border-foreground/30'
+                                  : 'border-foreground/20 hover:border-foreground/50'
                                 }`}
                             >
-                              <div className="flex items-center gap-1">
+                              <SlidePreview slide={s} />
+                              <div className="absolute inset-x-1 top-1 flex items-start">
                                 <span
-                                  className={`min-w-0 flex-1 text-[14px] font-bold px-1.5 py-0.5 rounded-base border border-black leading-tight ${kindColors[s.type]}`}
+                                  className={`min-w-0 flex-1 text-xs font-bold px-1.5 py-0.5 rounded-base border border-black leading-tight ${kindColors[s.type]}`}
                                 >
-                                  <span className="block overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%_-_10px),transparent)]">
+                                  <span className="block truncate">
                                     {labels[s.type]}
                                   </span>
                                 </span>
                                 {i === selectedIndex && (
-                                  <div className="w-0 shrink-0 overflow-hidden opacity-0 transition-[width,opacity] duration-150 ease-out group-hover:w-4 group-hover:opacity-100 has-[:focus-visible]:w-4 has-[:focus-visible]:opacity-100 has-[[data-popup-open]]:w-4 has-[[data-popup-open]]:opacity-100">
+                                  <div className="flex w-0 shrink-0 justify-end overflow-hidden opacity-0 transition-[width,opacity] duration-150 ease-out group-hover:w-6 group-hover:opacity-100 has-[:focus-visible]:w-6 has-[:focus-visible]:opacity-100 has-[[data-popup-open]]:w-6 has-[[data-popup-open]]:opacity-100">
                                     <DropdownMenu>
                                       <DropdownMenuTrigger
                                         onClick={(e) => e.stopPropagation()}
-                                        className="w-4 inline-flex items-center justify-center rounded p-0.5 text-foreground/60 cursor-pointer hover:bg-gray-200 hover:text-foreground"
+                                        className="size-5 inline-flex items-center justify-center rounded-base border border-black bg-white text-foreground cursor-pointer hover:bg-gray-200"
                                         data-testid={`slide-menu-${i}`}
                                         aria-label="Menu slide"
                                       >
                                         <MoreVerticalIcon className="size-4 rotate-90" />
                                       </DropdownMenuTrigger>
-                                      <DropdownMenuContent side="top" align="end" className="min-w-[130px]">
-                                        <DropdownMenuItem
-                                          onClick={() => duplicateSlide(i)}
-                                          data-testid={`slide-duplicate-${i}`}
-                                        >
-                                          <CopyIcon className="size-3 mr-2" /> Duplikat
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                          onClick={() => setDeleteConfirmSlideId(s.id)}
-                                          className="text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-white hover:border-border focus:bg-[var(--error)] focus:text-white focus:border-border data-highlighted:bg-[var(--error)] data-highlighted:text-black data-highlighted:border-border"
-                                          data-testid={`slide-delete-${i}`}
-                                        >
-                                          <Trash2Icon className="size-3 mr-2" /> Hapus
-                                        </DropdownMenuItem>
+                                      <DropdownMenuContent side="top" className="min-w-24 p-0.5">
+                                        <SlideMenuItems
+                                          testIdPrefix="slide"
+                                          index={i}
+                                          onDuplicate={() => duplicateSlide(i)}
+                                          onDelete={() => setDeleteConfirmSlideId(s.id)}
+                                        />
                                       </DropdownMenuContent>
                                     </DropdownMenu>
                                   </div>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1">
-                                <span className="w-3.5 shrink-0 text-end text-sm font-bold text-foreground/60">
+                              <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 border-t border-black/20 bg-black/10 px-1.5 py-0.5">
+                                <span className="shrink-0 text-xs text-end font-bold text-foreground/70">
                                   {i + 1}
                                 </span>
-                                <span className="flex-1 truncate text-sm text-foreground/70" data-testid={`slide-title-${i}`}>
-                                  {'- '}{s.title || '(tanpa judul)'}
+                                <span className="flex-1 truncate text-xs text-foreground/70" data-testid={`slide-title-${i}`}>
+                                  {"- "}{s.title || '(tanpa judul)'}
                                 </span>
                               </div>
                             </ContextMenuTrigger>
@@ -621,22 +646,13 @@ export function EditClient() {
                             </p>
                           </TooltipContent>
                         </Tooltip>
-                        <ContextMenuContent side="top" className="min-w-[130px]">
-                          <ContextMenuItem
-                            onClick={() => duplicateSlide(i)}
-                            className="cursor-pointer"
-                            data-testid={`slide-ctx-duplicate-${i}`}
-                          >
-                            <CopyIcon className="size-3 mr-2" /> Duplikat
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          <ContextMenuItem
-                            onClick={() => setDeleteConfirmSlideId(s.id)}
-                            className="text-[var(--error-fg)] hover:bg-[var(--error)] cursor-pointer hover:text-white hover:border-border focus:bg-[var(--error)] focus:text-white focus:border-border data-highlighted:bg-[var(--error)] data-highlighted:text-black data-highlighted:border-border"
-                            data-testid={`slide-ctx-delete-${i}`}
-                          >
-                            <Trash2Icon className="size-3 mr-2" /> Hapus
-                          </ContextMenuItem>
+                        <ContextMenuContent side="top" className="min-w-24 p-0.5">
+                          <SlideMenuItems
+                            testIdPrefix="slide-ctx"
+                            index={i}
+                            onDuplicate={() => duplicateSlide(i)}
+                            onDelete={() => setDeleteConfirmSlideId(s.id)}
+                          />
                         </ContextMenuContent>
                       </ContextMenu>
                     </Fragment>
