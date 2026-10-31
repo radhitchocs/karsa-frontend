@@ -66,6 +66,8 @@ import {
 } from '@/domain/model';
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
+import type { Editor } from '@tiptap/react';
+import { RichTextField, RichTextToolbar } from './RichTextEditor';
 
 type PresentationDetail = {
   id: string;
@@ -958,21 +960,7 @@ function MateriCanvas({
   onChange: (patch: Partial<Slide>) => void;
 }) {
   const layout = slide.layout ?? 'teks';
-  const titleRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-
-  // Seed plain text once when slide changes (avoid resetting caret mid-edit)
-  useEffect(() => {
-    if (titleRef.current && titleRef.current.textContent !== slide.title) {
-      titleRef.current.textContent = slide.title;
-    }
-  }, [slide.id]); // only on slide switch, not every keystroke
-
-  useEffect(() => {
-    if (bodyRef.current && bodyRef.current.textContent !== (slide.body ?? '')) {
-      bodyRef.current.textContent = slide.body ?? '';
-    }
-  }, [slide.id]);
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -1004,27 +992,34 @@ function MateriCanvas({
 
       {/* Canvas */}
       <div className="border-2 border-border rounded-base bg-white shadow-[4px_4px_0px_0px_var(--border)] overflow-hidden">
+        <div className="border-b-2 border-border bg-secondary-background px-3 py-2">
+          <RichTextToolbar editor={activeEditor} />
+        </div>
         <div
           className={`p-6 min-h-[280px] flex gap-4 ${layout === 'teks' ? 'flex-col' : 'flex-row items-start'
             }`}
         >
           {/* Text column */}
           <div className={`flex flex-col gap-3 ${layout !== 'teks' ? 'flex-1' : 'w-full'}`}>
-            <div
-              ref={titleRef}
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => onChange({ title: e.currentTarget.textContent ?? '' })}
-              data-testid="canvas-title"
-              className="text-2xl font-bold text-foreground outline-none border-b-2 border-transparent focus:border-main pb-1 min-h-[2.5rem] empty:before:content-['Judul_slide…'] empty:before:text-foreground/50"
+            <RichTextField
+              kind="title"
+              doc={slide.titleDoc}
+              text={slide.title}
+              placeholder="Judul slide…"
+              testId="canvas-title"
+              className="text-2xl font-bold text-foreground outline-none border-b-2 border-transparent focus:border-main pb-1 min-h-[2.5rem]"
+              onChange={(titleDoc, title) => onChange({ titleDoc, title })}
+              onFocus={setActiveEditor}
             />
-            <div
-              ref={bodyRef}
-              contentEditable
-              suppressContentEditableWarning
-              onBlur={(e) => onChange({ body: e.currentTarget.textContent ?? '' })}
-              data-testid="canvas-body"
-              className="text-base text-foreground/70 outline-none min-h-[5rem] empty:before:content-['Deskripsi…'] empty:before:text-foreground/60"
+            <RichTextField
+              kind="body"
+              doc={slide.bodyDoc}
+              text={slide.body ?? ''}
+              placeholder="Deskripsi…"
+              testId="canvas-body"
+              className="text-base text-foreground/70 outline-none min-h-[5rem]"
+              onChange={(bodyDoc, body) => onChange({ bodyDoc, body })}
+              onFocus={setActiveEditor}
             />
           </div>
 

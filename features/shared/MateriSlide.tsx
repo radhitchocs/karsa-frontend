@@ -1,5 +1,8 @@
 'use client';
 
+import type { RichNode } from '@/domain/model';
+import { RichText, richTextClass } from './rich-text';
+
 type Layout =
   | 'teks'
   | 'teks-gambar'
@@ -10,6 +13,8 @@ type Layout =
 type Props = {
   title: string;
   body?: string;
+  titleDoc?: RichNode;
+  bodyDoc?: RichNode;
   image?: string;
   image2?: string;
   layout?: Layout;
@@ -31,6 +36,8 @@ const imgBorderClass =
 export function MateriSlide({
   title,
   body,
+  titleDoc,
+  bodyDoc,
   image,
   image2,
   layout,
@@ -45,11 +52,23 @@ export function MateriSlide({
     ? 'text-2xl text-foreground/70 leading-snug'
     : 'text-base text-foreground/70 leading-relaxed';
 
+  const heading = (
+    <h2 className={titleClass} style={titleStyle}>
+      <RichText doc={titleDoc} fallback={title} kind="title" />
+    </h2>
+  );
+  const text = (extra = '') =>
+    body ? (
+      <div className={`${bodyClass} ${richTextClass} ${extra}`}>
+        <RichText doc={bodyDoc} fallback={body} kind="body" />
+      </div>
+    ) : null;
+
   if (norm === 'teks') {
     return (
       <div className="flex flex-col gap-4 h-full justify-center">
-        <h2 className={titleClass} style={titleStyle}>{title}</h2>
-        {body && <p className={bodyClass}>{body}</p>}
+        {heading}
+        {text()}
       </div>
     );
   }
@@ -58,8 +77,8 @@ export function MateriSlide({
     return (
       <div className="flex gap-4 h-full items-center">
         <div className="flex flex-col gap-3 flex-1 min-w-0">
-          <h2 className={titleClass} style={titleStyle}>{title}</h2>
-          {body && <p className={bodyClass}>{body}</p>}
+          {heading}
+          {text()}
         </div>
         {image && (
           <div className="w-2/5 shrink-0">
@@ -77,8 +96,8 @@ export function MateriSlide({
     return (
       <div className="flex flex-col gap-4 h-full">
         <div className="shrink-0">
-          <h2 className={titleClass} style={titleStyle}>{title}</h2>
-          {body && <p className={`mt-2 ${bodyClass}`}>{body}</p>}
+          {heading}
+          {text('mt-2')}
         </div>
         <div className="flex gap-4 flex-1 min-h-0">
           {image && (
@@ -102,8 +121,8 @@ export function MateriSlide({
   return (
     <div className="flex gap-4 h-full items-stretch">
       <div className="flex flex-col gap-3 flex-1 min-w-0 justify-center">
-        <h2 className={titleClass} style={titleStyle}>{title}</h2>
-        {body && <p className={bodyClass}>{body}</p>}
+        {heading}
+        {text()}
       </div>
       <div className="w-1/2 shrink-0 flex flex-col gap-3 min-h-0">
         {image && (

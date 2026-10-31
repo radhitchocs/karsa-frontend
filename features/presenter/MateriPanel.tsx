@@ -15,6 +15,8 @@ export function MateriPanel({
         <MateriSlide
           title={slide.title}
           body={slide.body || undefined}
+          titleDoc={slide.titleDoc}
+          bodyDoc={slide.bodyDoc}
           image={slide.image || undefined}
           image2={slide.image2 || undefined}
           layout={slide.layout}
