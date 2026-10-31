@@ -990,7 +990,11 @@ function SlideEditorHeader({
         className={`${pillBase} bg-secondary-background px-4 text-sm font-semibold tabular-nums`}
         aria-label={`Slide ${index + 1} dari ${total}`}
       >
-        {index + 1} / {total}
+        {/* Invisible widest value sizes the pill; the real one sits centered on top, so 9 → 10 doesn't resize it. */}
+        <span className="grid justify-items-center [&>*]:col-start-1 [&>*]:row-start-1">
+          <span className="invisible" aria-hidden="true">{total} / {total}</span>
+          <span>{index + 1} / {total}</span>
+        </span>
       </span>
       <span className={`${pillBase} px-4 text-sm font-bold ${kindColors[slide.type]}`}>
         {labels[slide.type]}
