@@ -1,0 +1,1358 @@
+'use client';
+
+import { Fragment, useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
+import { useRouter, useParams } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  PlusIcon,
+  Trash2Icon,
+  PlayIcon,
+  CheckIcon,
+  MoreVerticalIcon,
+  CopyIcon,
+  FileTextIcon,
+  ListChecksIcon,
+  BarChart2Icon,
+  CloudIcon,
+  MessageSquareIcon,
+  UsersIcon,
+  TrophyIcon,
+  ImageIcon,
+  BarChart3Icon,
+  HomeIcon,
+  FishIcon,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { apiFetch, API_BASE } from '@/lib/api';
+import { getToken } from '@/lib/auth';
+import { toast } from '@/components/ui/toast';
+import {
+  type Slide,
+  type Kind,
+  type QuizQuestion,
+  kinds,
+  labels,
+  uid,
+  newSlide,
+  quizOrderErrors,
+} from '@/domain/model';
+import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
+
+type PresentationDetail = {
+  id: string;
+  title: string;
+  slidesJson: Slide[];
+  updatedAt: string;
+  version: number;
+};
+
+type SessionResult = {
+  id: string;
+  code: string;
+  status: string;
+  createdAt: string;
+  endedAt: string | null;
+  participantCount: number;
+  slides: Array<{
+    id: string;
+    type: string;
+    title: string;
+    responseCount: number;
+    responses: Array<{ value: unknown; ownerLabel: string | null }>;
+    questions: Array<{ text: string; visible: boolean; answered: boolean }>;
+  }>;
+  quizScores: Array<{
+    questionRunId: string;
+    questionIndex: number;
+    ownerLabel: string | null;
+    optionIndex: number;
+    isCorrect: boolean;
+    score: number;
+  }>;
+};
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
+
+/** Solid fill bg class for slide type indicators (left bar, badge). PRD §17.1 type colors. */
+const kindColors: Record<Kind, string> = {
+  materi: 'bg-[#60A5FA]',
+  pilihan: 'bg-[#A78BFA]',
+  polling: 'bg-[#FB923C]',
+  awan: 'bg-[#FFD93D]',
+  tanya: 'bg-[#FF8FCB]',
+  kelompok: 'bg-[#2DD4BF]',
+  kuis: 'bg-[#B8F25B]',
+  pancing:  'bg-[#FF6B6B]',
+};
+
+const kindIcons: Record<Kind, React.ReactNode> = {
+  materi: <FileTextIcon className="size-4" />,
+  pilihan: <ListChecksIcon className="size-4" />,
+  polling: <BarChart2Icon className="size-4" />,
+  awan: <CloudIcon className="size-4" />,
+  tanya: <MessageSquareIcon className="size-4" />,
+  kelompok: <UsersIcon className="size-4" />,
+  kuis: <TrophyIcon className="size-4" />,
+  pancing: <FishIcon className="size-4" />,
+};
+
+/** Hover-expanding "+" slot between slides in the filmstrip. */
+function SlideInsertGap({
+  index,
+  open,
+  onOpenChange,
+  onPick,
+}: {
+  index: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPick: (kind: Kind) => void;
+}) {
+  return (
+    <div className="group/gap flex w-4 shrink-0 items-center justify-center overflow-hidden transition-[width] duration-200 ease-out delay-0 hover:delay-200 hover:w-12 has-[[data-popup-open]]:w-12 has-[[data-popup-open]]:delay-0">
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger
+          className="inline-flex shrink-0 items-center justify-center rounded-base border-2 border-opacity-100 border-foreground/30 hover:border-foreground/60 bg-secondary-background p-1 text-foreground/60 opacity-0 transition-opacity delay-0 hover:text-foreground group-hover/gap:opacity-100 group-hover/gap:delay-200 data-[popup-open]:opacity-100 cursor-pointer"
+          aria-label="Tambah slide di sini"
+          data-testid={`insert-slide-gap-${index}`}
+        >
+          <PlusIcon className="size-3" />
+        </PopoverTrigger>
+        <PopoverContent className="w-52 p-1" side="top" align="center" sideOffset={6}>
+          <div className="flex flex-col gap-0.5">
+            {kinds.map((k) => (
+              <button
+                key={k}
+                onClick={() => onPick(k)}
+                className="flex items-center gap-2 px-3 py-2 rounded-base text-sm font-medium hover:bg-main hover:text-main-foreground text-left w-full transition-colors cursor-pointer"
+                data-testid={`insert-slide-${index}-${k}`}
+              >
+                {kindIcons[k]}
+                {labels[k]}
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+const AUTOSAVE_DELAY_MS = 1500;
+
+export function EditClient() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const queryClient = useQueryClient();
+
+  const [title, setTitle] = useState('');
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [dirty, setDirty] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [deleteConfirmSlideId, setDeleteConfirmSlideId] = useState<string | null>(null);
+  const [addPopoverOpen, setAddPopoverOpen] = useState(false);
+  const [insertOpen, setInsertOpen] = useState<number | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dragStep, setDragStep] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [activeTab, setActiveTab] = useState<'edit' | 'results'>('edit');
+
+  // Track last saved version for optimistic locking
+  const lastSavedVersionRef = useRef<number | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slideListRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef(title);
+  const slidesRef = useRef(slides);
+  titleRef.current = title;
+  slidesRef.current = slides;
+
+  useEffect(() => {
+    setMounted(true);
+    if (!getToken()) router.push('/login');
+  }, [router]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const { data, isLoading } = useQuery<PresentationDetail>({
+    queryKey: ['presentation', id],
+    queryFn: () => apiFetch<PresentationDetail>(`/api/presentations/${id}`),
+    enabled: mounted && !!id && !!getToken(),
+  });
+
+  useEffect(() => {
+    if (data) {
+      setTitle(data.title ?? '');
+      setSlides(data.slidesJson ?? []);
+      setDirty(false);
+      lastSavedVersionRef.current = data.version;
+    }
+  }, [data]);
+
+  const saveMutation = useMutation({
+    mutationFn: (opts: { currentTitle: string; currentSlides: Slide[] }) =>
+      Promise.all([
+        apiFetch(`/api/presentations/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ title: opts.currentTitle }),
+        }),
+        apiFetch<PresentationDetail>(`/api/presentations/${id}/slides`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            slides: opts.currentSlides,
+            ...(lastSavedVersionRef.current !== null
+              ? { expectedVersion: lastSavedVersionRef.current }
+              : {}),
+          }),
+        }),
+      ]),
+    onMutate: () => setSaveStatus('saving'),
+    onSuccess: ([, slidesResult]) => {
+      queryClient.invalidateQueries({ queryKey: ['presentations'] });
+      setDirty(false);
+      setSaveStatus('saved');
+      lastSavedVersionRef.current = (slidesResult as PresentationDetail).version ?? null;
+      setTimeout(() => setSaveStatus((s) => (s === 'saved' ? 'idle' : s)), 3000);
+    },
+    onError: (err: Error) => {
+      const is409 = err.message?.includes('409') || err.message?.includes('tab lain');
+      if (is409) {
+        setSaveStatus('conflict');
+        toast.add({
+          title: 'Konflik penyimpanan',
+          description: 'Presentasi telah diubah di tab lain. Muat ulang untuk melihat versi terbaru.',
+          type: 'error',
+        });
+      } else {
+        setSaveStatus('error');
+        toast.add({ title: 'Gagal menyimpan', description: err.message, type: 'error' });
+      }
+    },
+  });
+
+  // Debounced autosave
+  function scheduleSave() {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      if (saveStatus !== 'conflict') {
+        saveMutation.mutate({
+          currentTitle: titleRef.current,
+          currentSlides: slidesRef.current,
+        });
+      }
+    }, AUTOSAVE_DELAY_MS);
+  }
+
+  const startMutation = useMutation({
+    mutationFn: () =>
+      apiFetch<{ sessionId: string }>(`/api/presentations/${id}/sessions`, { method: 'POST' }),
+    onSuccess: (s) => router.push(`/session/${s.sessionId}/presenter`),
+    onError: (err: Error) => {
+      toast.add({ title: 'Gagal memulai sesi', description: err.message, type: 'error' });
+    },
+  });
+
+  function mark() {
+    setDirty(true);
+    setSaveStatus('idle');
+    scheduleSave();
+  }
+
+  function updateSlide(index: number, patch: Partial<Slide>) {
+    setSlides((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+    mark();
+  }
+
+  function addSlide(kind: Kind, at?: number) {
+    const slide = newSlide(kind);
+    setSlides((prev) => {
+      if (kind === 'kuis') {
+        if (prev.some((s) => s.type === 'kuis')) {
+          toast.add({ title: 'Maksimal satu slide Kuis.', type: 'error' });
+          return prev;
+        }
+        return [...prev, slide];
+      }
+      const quizIdx = prev.findIndex((s) => s.type === 'kuis');
+      const next = [...prev];
+      const limit = quizIdx === -1 ? next.length : quizIdx;
+      const index = at === undefined ? limit : Math.min(at, limit);
+      next.splice(index, 0, slide);
+      setSelectedIndex(index);
+      return next;
+    });
+    mark();
+  }
+
+  function removeSlide(index: number) {
+    setSlides((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setSelectedIndex((si) => Math.min(si, Math.max(0, next.length - 1)));
+      return next;
+    });
+    mark();
+  }
+
+  function duplicateSlide(index: number) {
+    setSlides((prev) => {
+      const s = prev[index];
+      const copy: Slide = { ...s, id: uid(), title: s.title + ' (salinan)' };
+      const next = [...prev];
+      const insertAt = s.type === 'kuis' ? next.length : index + 1;
+      next.splice(insertAt, 0, copy);
+      setSelectedIndex(insertAt);
+      return next;
+    });
+    mark();
+  }
+
+  function dropSlide(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    setSlides((prev) => {
+      const next = [...prev];
+      const moving = next[fromIndex];
+      if (moving.type === 'kuis') return prev;
+      if (next[toIndex]?.type === 'kuis') return prev;
+      next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moving);
+      setSelectedIndex(toIndex);
+      return next;
+    });
+    mark();
+  }
+
+  const selected = slides[selectedIndex];
+  const durationErrors = slides
+    .filter((s) => s.type === 'kuis')
+    .filter((s) => {
+      const d = s.duration ?? 0;
+      return !Number.isFinite(d) || d < 10 || d > 120;
+    })
+    .map(() => 'Durasi kuis harus antara 10–120 detik.');
+  const orderErrors = slides.length > 0 ? quizOrderErrors(slides) : [];
+  const validationErrors = [...orderErrors, ...durationErrors];
+
+  const saveStatusLabel: Record<SaveStatus, string | null> = {
+    idle: dirty ? 'Belum disimpan' : null,
+    saving: 'Menyimpan...',
+    saved: 'Tersimpan',
+    conflict: 'Konflik — muat ulang',
+    error: 'Gagal menyimpan',
+  };
+
+  if (isLoading) {
+    return (
+      <main className="flex flex-1 items-center justify-center">
+        <p>Memuat…</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex flex-col h-screen">
+      {/* Top bar */}
+      <header className="border-b-2 border-border bg-secondary-background px-4 py-3 flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 w-[12.25rem] shrink-0">
+          <Image src="/faveicon.svg" alt="" aria-hidden="true" width={40} height={40} />
+          <span className="font-black text-3xl tracking-tight">Karsa</span>
+          <Button variant="neutral" size="icon" className="ml-auto" onClick={() => router.push('/')}>
+            <HomeIcon className="size-4" />
+          </Button>
+        </div>
+        <Input
+          value={title}
+          onChange={(e) => { setTitle(e.target.value); mark(); }}
+          className="flex-1 max-w-xs font-semibold"
+          placeholder="Judul presentasi"
+        />
+        {/* Save status indicator */}
+        {saveStatusLabel[saveStatus] && (
+          <span
+            className={`text-xs ${saveStatus === 'saved' ? 'text-foreground/70' :
+              saveStatus === 'conflict' || saveStatus === 'error' ? 'text-[var(--error)]' :
+                'text-foreground/70'
+              }`}
+          >
+            {saveStatusLabel[saveStatus]}
+          </span>
+        )}
+        {saveStatus === 'conflict' && (
+          <Button variant="neutral" size="sm" onClick={() => window.location.reload()}>
+            Muat Ulang
+          </Button>
+        )}
+        {/* Results tab toggle */}
+        <Button
+          variant={activeTab === 'results' ? 'default' : 'neutral'}
+          size="sm"
+          onClick={() => setActiveTab(activeTab === 'results' ? 'edit' : 'results')}
+        >
+          <BarChart3Icon className="size-4 mr-1" />
+          Hasil
+        </Button>
+        <Button
+          size="sm"
+          data-testid="mulai-sesi-btn"
+          disabled={startMutation.isPending || slides.length === 0}
+          onClick={() => {
+            if (validationErrors.length > 0) {
+              toast.add({ title: 'Tidak dapat memulai sesi', description: validationErrors[0], type: 'error' });
+              return;
+            }
+            startMutation.mutate();
+          }}
+        >
+          <PlayIcon className="size-4 mr-1" />
+          Mulai Sesi
+        </Button>
+      </header>
+
+      {activeTab === 'results' ? (
+        <ResultsArea presentationId={id} />
+      ) : (
+        <div className="flex flex-1 min-h-0 flex-col">
+          {/* Slide editor (canvas + form) */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {!selected ? (
+              <div className="flex items-center justify-center h-full text-foreground/60">
+                Pilih atau tambahkan slide untuk mulai mengedit.
+              </div>
+            ) : (
+              <SlideEditor
+                key={selected.id}
+                slide={selected}
+                index={selectedIndex}
+                onChange={(patch) => updateSlide(selectedIndex, patch)}
+              />
+            )}
+          </div>
+
+          {/* Slide filmstrip */}
+          <section className="shrink-0 border-t-2 border-border bg-secondary-background flex flex-col">
+            <div className="flex items-stretch">
+              <div className="flex items-center p-2 border-r-2 border-border">
+                <Popover open={addPopoverOpen} onOpenChange={setAddPopoverOpen}>
+                  <PopoverTrigger
+                    openOnHover
+                    delay={100}
+                    className="inline-flex items-center justify-center h-9 px-3 text-sm font-semibold bg-main text-main-foreground border-2 border-border rounded-base shadow-[4px_4px_0px_0px_var(--border)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all whitespace-nowrap cursor-pointer"
+                    data-testid="add-slide-btn"
+                  >
+                    <PlusIcon className="size-4 mr-1" />
+                    Slide Baru
+                  </PopoverTrigger>
+                  <PopoverContent className="w-52 p-1" side="top" align="start" sideOffset={6}>
+                    <div className="flex flex-col gap-0.5" data-testid="add-slide-popover">
+                      {kinds.map((k) => (
+                        <button
+                          key={k}
+                          onClick={() => { addSlide(k); setAddPopoverOpen(false); }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-base text-sm font-medium hover:bg-main hover:text-main-foreground text-left w-full transition-colors cursor-pointer"
+                          data-testid={`add-slide-${k}`}
+                        >
+                          {kindIcons[k]}
+                          {labels[k]}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div ref={slideListRef} className="relative flex-1 overflow-x-auto p-2 flex flex-row min-h-[104px]">
+                {slides.length === 0 && (
+                  <p className="text-xs text-foreground/60 self-center px-2">
+                    Belum ada slide. Tambahkan di atas.
+                  </p>
+                )}
+                {slides.map((s, i) => {
+                  const dragging = dragIndex !== null && dragOverIndex !== null;
+                  let shift = 0;
+                  let isDragged = false;
+                  if (dragIndex !== null && dragOverIndex !== null) {
+                    const dropAt = dragOverIndex > dragIndex ? dragOverIndex - 1 : dragOverIndex;
+                    isDragged = i === dragIndex;
+                    if (isDragged) shift = dropAt - dragIndex;
+                    else if (dragIndex < i && i <= dropAt) shift = -1;
+                    else if (dropAt <= i && i < dragIndex) shift = 1;
+                  }
+
+                  return (
+                    <Fragment key={s.id}>
+                      <SlideInsertGap
+                        index={i}
+                        open={insertOpen === i}
+                        onOpenChange={(open) => setInsertOpen(open ? i : null)}
+                        onPick={(kind) => { addSlide(kind, i); setInsertOpen(null); }}
+                      />
+                      <ContextMenu onOpenChange={(open) => { if (open) setSelectedIndex(i); }}>
+                        <Tooltip disableHoverablePopup>
+                          <TooltipTrigger
+                            render={<ContextMenuTrigger
+                              data-testid={`slide-item-${i}`}
+                              draggable={s.type !== 'kuis'}
+                              onDragStart={(e) => {
+                                setDragIndex(i);
+                                setDragOverIndex(i);
+                                setDragStep(e.currentTarget.offsetWidth + 16);
+                              }}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                const list = slideListRef.current;
+                                const item = e.currentTarget;
+                                const x = list
+                                  ? e.clientX - list.getBoundingClientRect().left + list.scrollLeft
+                                  : e.clientX;
+                                setDragOverIndex(x > item.offsetLeft + item.offsetWidth / 2 ? i + 1 : i);
+                              }}
+                              onDragEnd={() => {
+                                if (dragIndex !== null && dragOverIndex !== null) {
+                                  const to = dragOverIndex > dragIndex ? dragOverIndex - 1 : dragOverIndex;
+                                  dropSlide(dragIndex, to);
+                                }
+                                setDragIndex(null);
+                                setDragOverIndex(null);
+                              }}
+                              onClick={() => setSelectedIndex(i)}
+                              style={dragging ? { transform: `translateX(${shift * dragStep}px)` } : undefined}
+                              className={`group relative w-40 shrink-0 flex flex-col gap-1 p-2 rounded-base border-2 cursor-pointer select-none ${dragging ? 'transition-[transform,border-color] duration-150 ease-out' : 'transition-colors'} ${dragging && isDragged
+                                ? 'border-foreground opacity-60 z-10 pointer-events-none'
+                                : i === selectedIndex
+                                  ? 'border-foreground shadow-[2px_2px_0_0_#000]'
+                                  : 'border-transparent hover:border-foreground/30'
+                                }`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span
+                                  className={`min-w-0 flex-1 text-[14px] font-bold px-1.5 py-0.5 rounded-base border border-black leading-tight ${kindColors[s.type]}`}
+                                >
+                                  <span className="block overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%_-_10px),transparent)]">
+                                    {labels[s.type]}
+                                  </span>
+                                </span>
+                                {i === selectedIndex && (
+                                  <div className="w-0 shrink-0 overflow-hidden opacity-0 transition-[width,opacity] duration-150 ease-out group-hover:w-4 group-hover:opacity-100 has-[:focus-visible]:w-4 has-[:focus-visible]:opacity-100 has-[[data-popup-open]]:w-4 has-[[data-popup-open]]:opacity-100">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-4 inline-flex items-center justify-center rounded p-0.5 text-foreground/60 cursor-pointer hover:bg-gray-200 hover:text-foreground"
+                                        data-testid={`slide-menu-${i}`}
+                                        aria-label="Menu slide"
+                                      >
+                                        <MoreVerticalIcon className="size-4 rotate-90" />
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent side="top" align="end" className="min-w-[130px]">
+                                        <DropdownMenuItem
+                                          onClick={() => duplicateSlide(i)}
+                                          data-testid={`slide-duplicate-${i}`}
+                                        >
+                                          <CopyIcon className="size-3 mr-2" /> Duplikat
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => setDeleteConfirmSlideId(s.id)}
+                                          className="text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-white hover:border-border focus:bg-[var(--error)] focus:text-white focus:border-border data-highlighted:bg-[var(--error)] data-highlighted:text-black data-highlighted:border-border"
+                                          data-testid={`slide-delete-${i}`}
+                                        >
+                                          <Trash2Icon className="size-3 mr-2" /> Hapus
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="w-3.5 shrink-0 text-end text-sm font-bold text-foreground/60">
+                                  {i + 1}
+                                </span>
+                                <span className="flex-1 truncate text-sm text-foreground/70" data-testid={`slide-title-${i}`}>
+                                  {'- '}{s.title || '(tanpa judul)'}
+                                </span>
+                              </div>
+                            </ContextMenuTrigger>
+                            }
+                          />
+                          <TooltipContent side="top" className="pointer-events-none max-w-64">
+                            <p className="font-bold">Slide {i + 1} - {labels[s.type]}</p>
+                            <p className="truncate text-foreground/70">
+                              {s.title || '(tanpa judul)'}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <ContextMenuContent side="top" className="min-w-[130px]">
+                          <ContextMenuItem
+                            onClick={() => duplicateSlide(i)}
+                            className="cursor-pointer"
+                            data-testid={`slide-ctx-duplicate-${i}`}
+                          >
+                            <CopyIcon className="size-3 mr-2" /> Duplikat
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            onClick={() => setDeleteConfirmSlideId(s.id)}
+                            className="text-[var(--error-fg)] hover:bg-[var(--error)] cursor-pointer hover:text-white hover:border-border focus:bg-[var(--error)] focus:text-white focus:border-border data-highlighted:bg-[var(--error)] data-highlighted:text-black data-highlighted:border-border"
+                            data-testid={`slide-ctx-delete-${i}`}
+                          >
+                            <Trash2Icon className="size-3 mr-2" /> Hapus
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    </Fragment>
+                  );
+                })}
+                {slides.length > 0 && (
+                  <SlideInsertGap
+                    index={slides.length}
+                    open={insertOpen === slides.length}
+                    onOpenChange={(open) => setInsertOpen(open ? slides.length : null)}
+                    onPick={(kind) => { addSlide(kind, slides.length); setInsertOpen(null); }}
+                  />
+                )}
+              </div>
+            </div>
+            {validationErrors.length > 0 && (
+              <div className="p-2 border-t-2 border-[var(--error)] bg-secondary-background">
+                {validationErrors.map((e) => (
+                  <p key={e} className="text-xs text-foreground font-medium">{e}</p>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Delete confirmation dialog */}
+          <Dialog
+            open={deleteConfirmSlideId !== null}
+            onOpenChange={(open) => { if (!open) setDeleteConfirmSlideId(null); }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Hapus slide?</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-foreground/70">
+                Tindakan ini tidak dapat dibatalkan.
+              </p>
+              <DialogFooter>
+                <DialogClose className="inline-flex items-center justify-center h-9 px-3 text-sm font-semibold border-2 border-border rounded-base bg-white shadow-[4px_4px_0px_0px_var(--border)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all">
+                  Batal
+                </DialogClose>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="bg-[var(--error)] hover:bg-[var(--error)]/90 border-2 border-border"
+                  data-testid="slide-delete-confirm"
+                  onClick={() => {
+                    const idx = slides.findIndex((s) => s.id === deleteConfirmSlideId);
+                    if (idx !== -1) removeSlide(idx);
+                    setDeleteConfirmSlideId(null);
+                  }}
+                >
+                  Hapus
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </main>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ResultsArea — C8: past sessions of a presentation
+// ---------------------------------------------------------------------------
+
+function ResultsArea({ presentationId }: { presentationId: string }) {
+  const [activeSession, setActiveSession] = useState<string | null>(null);
+
+  const { data: results, isLoading } = useQuery<SessionResult[]>({
+    queryKey: ['presentation-results', presentationId],
+    queryFn: () => apiFetch<SessionResult[]>(`/api/presentations/${presentationId}/results`),
+    enabled: !!getToken(),
+  });
+
+  useEffect(() => {
+    if (results && results.length > 0 && !activeSession) {
+      setActiveSession(results[0].id);
+    }
+  }, [results, activeSession]);
+
+  if (isLoading) return <div className="flex flex-1 items-center justify-center p-8">Memuat hasil…</div>;
+  if (!results || results.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8 text-foreground/60">
+        Belum ada sesi yang tersimpan.
+      </div>
+    );
+  }
+
+  const session = results.find((s) => s.id === activeSession) ?? results[0];
+
+  return (
+    <div className="flex flex-1 min-h-0">
+      {/* Session tabs */}
+      <aside className="w-48 border-r-2 border-border bg-secondary-background flex flex-col overflow-y-auto p-2 gap-1 shrink-0">
+        <p className="text-xs font-semibold text-foreground/70 px-2 py-1">Sesi Lampau</p>
+        {results.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => setActiveSession(s.id)}
+            className={`text-left px-2 py-2 rounded-base border-2 text-xs transition-colors ${s.id === activeSession ? 'border-foreground shadow-[2px_2px_0_0_#000]' : 'border-transparent hover:border-foreground/20'
+              }`}
+          >
+            <div className="font-semibold">#{s.code}</div>
+            <div className="text-foreground/70">{new Date(s.createdAt).toLocaleDateString('id-ID')}</div>
+            <div className="text-foreground/70">{s.participantCount} peserta</div>
+          </button>
+        ))}
+      </aside>
+
+      {/* Session detail */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-2xl mx-auto flex flex-col gap-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold">Sesi #{session.code}</h2>
+            <Badge className={session.status === 'ENDED' ? 'bg-secondary-background border-border' : 'bg-[#34D399] border-black'}>
+              {session.status === 'ENDED' ? 'Selesai' : session.status}
+            </Badge>
+            <span className="text-sm text-foreground/70">
+              {new Date(session.createdAt).toLocaleString('id-ID')}
+            </span>
+          </div>
+
+          {session.slides.map((slide) => (
+            <Card key={slide.id} className="border-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">{slide.title} <span className="text-foreground/60 font-normal">({slide.type})</span></CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <p className="text-xs text-foreground/60">{slide.responseCount} respons</p>
+
+                {/* Polling/Pilihan: show response breakdown (value is string[] e.g. ["0"]) */}
+                {(slide.type === 'pilihan' || slide.type === 'polling') && slide.responses.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {Object.entries(
+                      slide.responses.reduce<Record<number, number>>((acc, r) => {
+                        const v = r.value as string[];
+                        const optIdx = Number(Array.isArray(v) ? v[0] : undefined);
+                        if (!isNaN(optIdx)) acc[optIdx] = (acc[optIdx] ?? 0) + 1;
+                        return acc;
+                      }, {}),
+                    ).map(([optIdx, count]) => (
+                      <div key={optIdx} className="flex items-center gap-2 text-xs">
+                        <span className="font-bold w-6">{String.fromCharCode(65 + Number(optIdx))}</span>
+                        <div className="flex-1 bg-foreground/10 rounded h-3 overflow-hidden">
+                          <div
+                            className="h-full bg-main"
+                            style={{ width: `${(count / slide.responseCount) * 100}%` }}
+                          />
+                        </div>
+                        <span className="w-6 text-right">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Awan kata: value is string[] of words */}
+                {slide.type === 'awan' && slide.responses.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {slide.responses.flatMap((r) => {
+                      const v = r.value as string[];
+                      return Array.isArray(v) ? v : [];
+                    }).map((w, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-cyan-100 border border-cyan-400 rounded text-xs">{w}</span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Q&A: show questions */}
+                {slide.type === 'tanya' && slide.questions.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {slide.questions.map((q, i) => (
+                      <div key={i} className="text-xs border border-border rounded p-2">
+                        <p>{q.text}</p>
+                        {q.visible && <span className="text-orange-600 font-medium">Ditampilkan</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Quiz scores */}
+          {session.quizScores.length > 0 && (
+            <Card className="border-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Skor Kuis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-foreground/60">{session.quizScores.length} jawaban tercatat</p>
+                <div className="mt-2 text-xs">
+                  {Array.from(new Set(session.quizScores.map((s) => s.ownerLabel))).slice(0, 10).map((ownerLabel) => {
+                    const scores = session.quizScores.filter((s) => s.ownerLabel === ownerLabel);
+                    const total = scores.reduce((s, a) => s + a.score, 0);
+                    const correct = scores.filter((s) => s.isCorrect).length;
+                    return (
+                      <div key={ownerLabel} className="flex justify-between py-0.5 border-b border-border/30">
+                        <span className="truncate max-w-[60%]">{ownerLabel ?? '—'}</span>
+                        <span>{correct}/{scores.length} benar · {total} poin</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SlideEditor — canvas (C2) + form per slide type
+// ---------------------------------------------------------------------------
+
+function SlideEditor({
+  slide,
+  index,
+  onChange,
+}: {
+  slide: Slide;
+  index: number;
+  onChange: (patch: Partial<Slide>) => void;
+}) {
+  return (
+    <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <Badge className={`${kindColors[slide.type]} border`}>{labels[slide.type]}</Badge>
+        <span className="text-xs text-foreground/60">Slide {index + 1}</span>
+      </div>
+
+      {/* C2: Materi canvas — inline WYSIWYG */}
+      {slide.type === 'materi' ? (
+        <MateriCanvas slide={slide} onChange={onChange} />
+      ) : (
+        <>
+          {/* Common: title (form for non-materi) */}
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="slide-title">Judul *</Label>
+            <Input
+              id="slide-title"
+              value={slide.title}
+              onChange={(e) => onChange({ title: e.target.value })}
+              placeholder="Judul slide"
+            />
+          </div>
+
+          {/* Common: body (most types) */}
+          {['pilihan', 'polling', 'awan', 'tanya'].includes(slide.type) && (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="slide-body">Deskripsi / Pertanyaan</Label>
+              <Textarea
+                id="slide-body"
+                value={slide.body}
+                onChange={(e) => onChange({ body: e.target.value })}
+                placeholder="Isi slide…"
+                rows={3}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Type-specific editors */}
+      {(slide.type === 'pilihan' || slide.type === 'polling') && (
+        <OptionsEditor slide={slide} onChange={onChange} />
+      )}
+
+      {slide.type === 'kelompok' && (
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="slide-groups">Jumlah kelompok default</Label>
+          <Input
+            id="slide-groups"
+            type="number"
+            min={2}
+            max={20}
+            value={slide.groups}
+            onChange={(e) => onChange({ groups: Number(e.target.value) })}
+            className="w-24"
+          />
+        </div>
+      )}
+
+      {slide.type === 'kuis' && (
+        <QuizEditor slide={slide} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MateriCanvas — C2: WYSIWYG for materi slides
+// ---------------------------------------------------------------------------
+
+function MateriCanvas({
+  slide,
+  onChange,
+}: {
+  slide: Slide;
+  onChange: (patch: Partial<Slide>) => void;
+}) {
+  const layout = slide.layout ?? 'teks';
+  const titleRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Seed plain text once when slide changes (avoid resetting caret mid-edit)
+  useEffect(() => {
+    if (titleRef.current && titleRef.current.textContent !== slide.title) {
+      titleRef.current.textContent = slide.title;
+    }
+  }, [slide.id]); // only on slide switch, not every keystroke
+
+  useEffect(() => {
+    if (bodyRef.current && bodyRef.current.textContent !== (slide.body ?? '')) {
+      bodyRef.current.textContent = slide.body ?? '';
+    }
+  }, [slide.id]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Layout selector */}
+      <div className="flex flex-col gap-2">
+        <Label>Layout</Label>
+        <div className="flex flex-wrap gap-2">
+          {(['teks', 'teks-gambar', 'dua-gambar-lr', 'dua-gambar-tb'] as const).map((l) => {
+            const isActive = layout === l || (l === 'dua-gambar-lr' && layout === 'dua-gambar');
+            return (
+              <button
+                key={l}
+                onClick={() => onChange({ layout: l })}
+                className={`px-3 py-1.5 border-2 rounded-base text-sm font-medium ${isActive ? 'border-foreground bg-foreground text-background shadow-[2px_2px_0_0_#000]' : 'border-border bg-secondary-background'
+                  }`}
+              >
+                {l === 'teks'
+                  ? 'Teks'
+                  : l === 'teks-gambar'
+                    ? 'Teks + Gambar'
+                    : l === 'dua-gambar-lr'
+                      ? 'Dua Gambar (Sejajar)'
+                      : 'Dua Gambar (Bertumpuk)'}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className="border-2 border-border rounded-base bg-white shadow-[4px_4px_0px_0px_var(--border)] overflow-hidden">
+        <div
+          className={`p-6 min-h-[280px] flex gap-4 ${layout === 'teks' ? 'flex-col' : 'flex-row items-start'
+            }`}
+        >
+          {/* Text column */}
+          <div className={`flex flex-col gap-3 ${layout !== 'teks' ? 'flex-1' : 'w-full'}`}>
+            <div
+              ref={titleRef}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => onChange({ title: e.currentTarget.textContent ?? '' })}
+              data-testid="canvas-title"
+              className="text-2xl font-bold text-foreground outline-none border-b-2 border-transparent focus:border-main pb-1 min-h-[2.5rem] empty:before:content-['Judul_slide…'] empty:before:text-foreground/50"
+            />
+            <div
+              ref={bodyRef}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => onChange({ body: e.currentTarget.textContent ?? '' })}
+              data-testid="canvas-body"
+              className="text-base text-foreground/70 outline-none min-h-[5rem] empty:before:content-['Deskripsi…'] empty:before:text-foreground/60"
+            />
+          </div>
+
+          {/* Image slots */}
+          {(layout === 'teks-gambar' ||
+            layout === 'dua-gambar' ||
+            layout === 'dua-gambar-lr' ||
+            layout === 'dua-gambar-tb') && (
+              <div
+                className={`flex gap-3 ${layout === 'dua-gambar' || layout === 'dua-gambar-lr'
+                  ? 'flex-row flex-1'
+                  : layout === 'dua-gambar-tb'
+                    ? 'flex-col w-40 shrink-0'
+                    : 'w-40 shrink-0'
+                  }`}
+              >
+                <ImageSlot
+                  url={slide.image}
+                  label="Gambar 1"
+                  testId="image-slot-0"
+                  onUpload={(url) => onChange({ image: url })}
+                />
+                {(layout === 'dua-gambar' ||
+                  layout === 'dua-gambar-lr' ||
+                  layout === 'dua-gambar-tb') && (
+                    <ImageSlot
+                      url={slide.image2 ?? ''}
+                      label="Gambar 2"
+                      testId="image-slot-1"
+                      onUpload={(url) => onChange({ image2: url })}
+                    />
+                  )}
+              </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ImageSlot — C1: clickable image slot that triggers file upload
+// ---------------------------------------------------------------------------
+
+function ImageSlot({ url, label, onUpload, testId }: { url: string; label: string; onUpload: (url: string) => void; testId?: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API_BASE}/api/assets`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message ?? `Upload gagal (${res.status})`);
+      }
+      const data = (await res.json()) as { url: string };
+      onUpload(data.url);
+    } catch (err) {
+      toast.add({ title: 'Upload gagal', description: String(err), type: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      className={`relative flex-1 border-2 border-dashed border-border rounded-base min-h-[120px] flex items-center justify-center cursor-pointer hover:border-main transition-colors ${uploading ? 'opacity-50' : ''
+        }`}
+      onClick={() => inputRef.current?.click()}
+      role="button"
+      aria-label={`Upload ${label}`}
+      data-testid={testId}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+      />
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={label} className="w-full h-full object-cover rounded-base" />
+      ) : (
+        <div className="flex flex-col items-center gap-1 text-foreground/50">
+          <ImageIcon className="size-6" />
+          <span className="text-xs">{uploading ? 'Mengunggah…' : label}</span>
+        </div>
+      )}
+      {url && (
+        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 rounded-base transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+          <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">Ganti</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OptionsEditor — pilihan / polling options
+// ---------------------------------------------------------------------------
+
+function OptionsEditor({
+  slide,
+  onChange,
+}: {
+  slide: Slide;
+  onChange: (patch: Partial<Slide>) => void;
+}) {
+  function updateOption(i: number, value: string) {
+    const next = [...slide.options];
+    next[i] = value;
+    onChange({ options: next });
+  }
+
+  function addOption() {
+    if (slide.options.length >= 6) return;
+    onChange({ options: [...slide.options, ''] });
+  }
+
+  function removeOption(i: number) {
+    if (slide.options.length <= 2) return;
+    const next = slide.options.filter((_, idx) => idx !== i);
+    const correct = slide.correct
+      .map((c) => (c > i ? c - 1 : c))
+      .filter((c) => c < next.length);
+    onChange({ options: next, correct });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Label>Opsi jawaban (2–6)</Label>
+      {slide.options.map((opt, i) => (
+        <div key={i} className="flex items-center gap-2">
+          {slide.type === 'pilihan' && (
+            <button
+              onClick={() => onChange({
+                correct: slide.correct.includes(i)
+                  ? slide.correct.filter((c) => c !== i)
+                  : [...slide.correct, i].sort((a, b) => a - b),
+              })}
+              className={`shrink-0 size-5 rounded border-2 flex items-center justify-center ${slide.correct.includes(i) ? 'bg-[#34D399] border-black' : 'border-border'
+                }`}
+              title="Tandai sebagai jawaban benar (boleh lebih dari satu)"
+            >
+              {slide.correct.includes(i) && <CheckIcon className="size-3" />}
+            </button>
+          )}
+          <span className="shrink-0 w-6 text-sm font-bold text-center">
+            {String.fromCharCode(65 + i)}
+          </span>
+          <Input
+            value={opt}
+            onChange={(e) => updateOption(i, e.target.value)}
+            placeholder={`Opsi ${String.fromCharCode(65 + i)}`}
+          />
+          <button
+            onClick={() => removeOption(i)}
+            disabled={slide.options.length <= 2}
+            className="shrink-0 text-foreground/60 hover:text-[var(--error)] disabled:opacity-20"
+          >
+            <Trash2Icon className="size-4" />
+          </button>
+        </div>
+      ))}
+      {slide.type === 'pilihan' && (
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="explanation">Penjelasan jawaban benar (opsional)</Label>
+          <Textarea
+            id="explanation"
+            value={slide.explanation}
+            onChange={(e) => onChange({ explanation: e.target.value })}
+            rows={2}
+            placeholder="Mengapa opsi ini benar?"
+          />
+        </div>
+      )}
+      <Button
+        variant="neutral"
+        size="sm"
+        onClick={addOption}
+        disabled={slide.options.length >= 6}
+        className="self-start"
+      >
+        <PlusIcon className="size-4 mr-1" />
+        Tambah Opsi
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// QuizEditor — S13
+// ---------------------------------------------------------------------------
+
+function QuizEditor({
+  slide,
+  onChange,
+}: {
+  slide: Slide;
+  onChange: (patch: Partial<Slide>) => void;
+}) {
+  const questions = slide.quizQuestions ?? [];
+
+  function addQuestion() {
+    const q: QuizQuestion = { id: uid(), title: '', options: ['', ''], correct: [] };
+    onChange({ quizQuestions: [...questions, q] });
+  }
+
+  function updateQuestion(qi: number, patch: Partial<QuizQuestion>) {
+    const next = questions.map((q, i) => (i === qi ? { ...q, ...patch } : q));
+    onChange({ quizQuestions: next });
+  }
+
+  function removeQuestion(qi: number) {
+    onChange({ quizQuestions: questions.filter((_, i) => i !== qi) });
+  }
+
+  function updateQOption(qi: number, oi: number, value: string) {
+    const q = questions[qi];
+    const opts = q.options.map((o, i) => (i === oi ? value : o));
+    updateQuestion(qi, { options: opts });
+  }
+
+  function addQOption(qi: number) {
+    const q = questions[qi];
+    if (q.options.length >= 6) return;
+    updateQuestion(qi, { options: [...q.options, ''] });
+  }
+
+  function removeQOption(qi: number, oi: number) {
+    const q = questions[qi];
+    if (q.options.length <= 2) return;
+    const opts = q.options.filter((_, i) => i !== oi);
+    const correct = q.correct
+      .map((c) => (c > oi ? c - 1 : c))
+      .filter((c) => c < opts.length);
+    updateQuestion(qi, { options: opts, correct });
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-3">
+          <Label htmlFor="quiz-duration">Durasi per soal (detik)</Label>
+          <Input
+            id="quiz-duration"
+            type="number"
+            min={10}
+            max={120}
+            step={5}
+            value={slide.duration ?? QUIZ_DEFAULT_DURATION}
+            onChange={(e) => onChange({ duration: Number(e.target.value) })}
+            className={`w-24 ${(slide.duration ?? 0) < 10 || (slide.duration ?? 0) > 120 ? 'border-[var(--error)]' : ''
+              }`}
+          />
+          <span className="text-xs text-foreground/70">10–120 dtk</span>
+        </div>
+        {((slide.duration ?? 0) < 10 || (slide.duration ?? 0) > 120) && (
+          <p className="text-xs text-[var(--error)]">Durasi harus antara 10–120 detik.</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <Label>Soal ({questions.length})</Label>
+          <Button variant="neutral" size="sm" onClick={addQuestion}>
+            <PlusIcon className="size-4 mr-1" />
+            Tambah Soal
+          </Button>
+        </div>
+
+        {questions.length === 0 && (
+          <p className="text-sm text-foreground/70 italic">Tambahkan minimal satu soal.</p>
+        )}
+
+        {questions.map((q, qi) => (
+          <Card key={q.id} className="border-2">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm">Soal {qi + 1}</CardTitle>
+                <button onClick={() => removeQuestion(qi)} className="text-foreground/60 hover:text-[var(--error)]">
+                  <Trash2Icon className="size-4" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <Input
+                value={q.title}
+                onChange={(e) => updateQuestion(qi, { title: e.target.value })}
+                placeholder="Teks pertanyaan…"
+              />
+              {q.options.map((opt, oi) => (
+                <div key={oi} className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQuestion(qi, {
+                      correct: q.correct.includes(oi)
+                        ? q.correct.filter((c) => c !== oi)
+                        : [...q.correct, oi].sort((a, b) => a - b),
+                    })}
+                    className={`shrink-0 size-5 rounded border-2 flex items-center justify-center ${q.correct.includes(oi) ? 'bg-[#34D399] border-black' : 'border-border'
+                      }`}
+                    title="Jawaban benar (boleh lebih dari satu)"
+                  >
+                    {q.correct.includes(oi) && <CheckIcon className="size-3" />}
+                  </button>
+                  <span className="shrink-0 w-6 text-sm font-bold text-center">
+                    {String.fromCharCode(65 + oi)}
+                  </span>
+                  <Input
+                    value={opt}
+                    onChange={(e) => updateQOption(qi, oi, e.target.value)}
+                    placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
+                  />
+                  <button
+                    onClick={() => removeQOption(qi, oi)}
+                    disabled={q.options.length <= 2}
+                    className="shrink-0 text-foreground/60 hover:text-[var(--error)] disabled:opacity-20"
+                  >
+                    <Trash2Icon className="size-4" />
+                  </button>
+                </div>
+              ))}
+              <Button
+                variant="neutral"
+                size="sm"
+                onClick={() => addQOption(qi)}
+                disabled={q.options.length >= 6}
+                className="self-start"
+              >
+                <PlusIcon className="size-4 mr-1" />
+                Tambah Opsi
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
