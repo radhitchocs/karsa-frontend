@@ -488,7 +488,7 @@ export function EditClient() {
       ) : (
         <div className="flex flex-1 min-h-0 flex-col">
           {/* Slide editor (canvas + form) */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex flex-1 flex-col overflow-y-auto p-6">
             {!selected ? (
               <div className="flex items-center justify-center h-full text-foreground/60">
                 Pilih atau tambahkan slide untuk mulai mengedit.
@@ -892,7 +892,7 @@ function SlideEditor({
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 
   return (
-    <div className="max-w-2xl mx-auto flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
       <SlideEditorHeader
         slide={slide}
         index={index}
@@ -902,63 +902,66 @@ function SlideEditor({
         onDelete={onDelete}
       />
 
-      {/* C2: Materi canvas — inline WYSIWYG */}
-      {slide.type === 'materi' ? (
-        <MateriCanvas slide={slide} onChange={onChange} onEditorFocus={setActiveEditor}
-          onEditorBlur={(e) => setActiveEditor((cur) => (cur === e ? null : cur))}
-        />
-      ) : (
-        <>
-          {/* Common: title (form for non-materi) */}
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="slide-title">Judul *</Label>
-            <Input
-              id="slide-title"
-              value={slide.title}
-              onChange={(e) => onChange({ title: e.target.value })}
-              placeholder="Judul slide"
-            />
-          </div>
-
-          {/* Common: body (most types) */}
-          {['pilihan', 'polling', 'awan', 'tanya'].includes(slide.type) && (
+      {/* Form fills the space under the header and sits vertically centered; taller forms just grow and scroll. */}
+      <div className="flex flex-1 flex-col justify-center gap-6 py-6">
+        {/* C2: Materi canvas — inline WYSIWYG */}
+        {slide.type === 'materi' ? (
+          <MateriCanvas slide={slide} onChange={onChange} onEditorFocus={setActiveEditor}
+            onEditorBlur={(e) => setActiveEditor((cur) => (cur === e ? null : cur))}
+          />
+        ) : (
+          <>
+            {/* Common: title (form for non-materi) */}
             <div className="flex flex-col gap-1">
-              <Label htmlFor="slide-body">Deskripsi / Pertanyaan</Label>
-              <Textarea
-                id="slide-body"
-                value={slide.body}
-                onChange={(e) => onChange({ body: e.target.value })}
-                placeholder="Isi slide…"
-                rows={3}
+              <Label htmlFor="slide-title">Judul *</Label>
+              <Input
+                id="slide-title"
+                value={slide.title}
+                onChange={(e) => onChange({ title: e.target.value })}
+                placeholder="Judul slide"
               />
             </div>
-          )}
-        </>
-      )}
 
-      {/* Type-specific editors */}
-      {(slide.type === 'pilihan' || slide.type === 'polling') && (
-        <OptionsEditor slide={slide} onChange={onChange} />
-      )}
+            {/* Common: body (most types) */}
+            {['pilihan', 'polling', 'awan', 'tanya'].includes(slide.type) && (
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="slide-body">Deskripsi / Pertanyaan</Label>
+                <Textarea
+                  id="slide-body"
+                  value={slide.body}
+                  onChange={(e) => onChange({ body: e.target.value })}
+                  placeholder="Isi slide…"
+                  rows={3}
+                />
+              </div>
+            )}
+          </>
+        )}
 
-      {slide.type === 'kelompok' && (
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="slide-groups">Jumlah kelompok default</Label>
-          <Input
-            id="slide-groups"
-            type="number"
-            min={2}
-            max={20}
-            value={slide.groups}
-            onChange={(e) => onChange({ groups: Number(e.target.value) })}
-            className="w-24"
-          />
-        </div>
-      )}
+        {/* Type-specific editors */}
+        {(slide.type === 'pilihan' || slide.type === 'polling') && (
+          <OptionsEditor slide={slide} onChange={onChange} />
+        )}
 
-      {slide.type === 'kuis' && (
-        <QuizEditor slide={slide} onChange={onChange} />
-      )}
+        {slide.type === 'kelompok' && (
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="slide-groups">Jumlah kelompok default</Label>
+            <Input
+              id="slide-groups"
+              type="number"
+              min={2}
+              max={20}
+              value={slide.groups}
+              onChange={(e) => onChange({ groups: Number(e.target.value) })}
+              className="w-24"
+            />
+          </div>
+        )}
+
+        {slide.type === 'kuis' && (
+          <QuizEditor slide={slide} onChange={onChange} />
+        )}
+      </div>
     </div>
   );
 }
