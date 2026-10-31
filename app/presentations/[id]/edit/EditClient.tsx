@@ -1401,6 +1401,97 @@ function ImageSlot({
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 6;
 
+type OptionsPatch = { options: string[]; correct: number[] };
+
+/**
+ * Option rows + full-width "Tambah Opsi", shared by Pilihan ganda, Polling and quiz questions.
+ * Pass `correct` to show the correct-answer checkboxes; omit it (polling) to hide them.
+ */
+function OptionList({
+  options,
+  correct,
+  onChange,
+}: {
+  options: string[];
+  correct?: number[];
+  onChange: (patch: OptionsPatch) => void;
+}) {
+  const marks = correct ?? [];
+
+  function update(i: number, value: string) {
+    onChange({ options: options.map((o, idx) => (idx === i ? value : o)), correct: marks });
+  }
+
+  function add() {
+    if (options.length >= MAX_OPTIONS) return;
+    onChange({ options: [...options, ''], correct: marks });
+  }
+
+  function remove(i: number) {
+    if (options.length <= MIN_OPTIONS) return;
+    const next = options.filter((_, idx) => idx !== i);
+    onChange({
+      options: next,
+      // Drop the removed option's mark, then shift later marks down by one.
+      correct: marks.filter((c) => c !== i).map((c) => (c > i ? c - 1 : c)),
+    });
+  }
+
+  function toggle(i: number) {
+    onChange({
+      options,
+      correct: marks.includes(i) ? marks.filter((c) => c !== i) : [...marks, i].sort((a, b) => a - b),
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {options.map((opt, i) => {
+        const letter = String.fromCharCode(65 + i);
+        const isCorrect = marks.includes(i);
+        return (
+          <div key={i} className="flex items-center gap-2">
+            {correct && (
+              <button
+                type="button"
+                aria-label={`Tandai opsi ${letter} sebagai jawaban benar`}
+                aria-pressed={isCorrect}
+                onClick={() => toggle(i)}
+                className={`flex size-5 shrink-0 cursor-pointer items-center justify-center rounded border-2 ${isCorrect ? 'border-black bg-[#34D399]' : 'border-border'}`}
+              >
+                {isCorrect && <CheckIcon className="size-3" />}
+              </button>
+            )}
+            <span className="w-4 shrink-0 text-center text-sm font-bold">{letter}</span>
+            <Input
+              value={opt}
+              onChange={(e) => update(i, e.target.value)}
+              placeholder={`Opsi ${letter}`}
+              aria-label={`Opsi ${letter}`}
+            />
+            <HintTooltip label="Hapus opsi ini">
+              <Button
+                variant="neutral"
+                size="icon"
+                aria-label={`Hapus opsi ${letter}`}
+                onClick={() => remove(i)}
+                disabled={options.length <= MIN_OPTIONS}
+                className={`shrink-0 ${dangerButtonClass}`}
+              >
+                <Trash2Icon />
+              </Button>
+            </HintTooltip>
+          </div>
+        );
+      })}
+      <Button variant="neutral" onClick={add} disabled={options.length >= MAX_OPTIONS} className="mt-1 w-full">
+        <PlusIcon />
+        {options.length >= MAX_OPTIONS ? 'Maksimal 6 opsi' : 'Tambah Opsi'}
+      </Button>
+    </div>
+  );
+}
+
 function OptionsEditor({
   slide,
   onChange,
@@ -1409,26 +1500,6 @@ function OptionsEditor({
   onChange: (patch: Partial<Slide>) => void;
 }) {
   const isPilihan = slide.type === 'pilihan';
-
-  function updateOption(i: number, value: string) {
-    const next = [...slide.options];
-    next[i] = value;
-    onChange({ options: next });
-  }
-
-  function addOption() {
-    if (slide.options.length >= MAX_OPTIONS) return;
-    onChange({ options: [...slide.options, ''] });
-  }
-
-  function removeOption(i: number) {
-    if (slide.options.length <= MIN_OPTIONS) return;
-    const next = slide.options.filter((_, idx) => idx !== i);
-    const correct = slide.correct
-      .map((c) => (c > i ? c - 1 : c))
-      .filter((c) => c < next.length);
-    onChange({ options: next, correct });
-  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -1442,61 +1513,11 @@ function OptionsEditor({
         {isPilihan && (
           <p className="-mt-1 text-xs text-foreground/60">Centang opsi yang benar (boleh lebih dari satu).</p>
         )}
-
-        <div className="flex flex-col gap-2">
-          {slide.options.map((opt, i) => {
-            const letter = String.fromCharCode(65 + i);
-            const isCorrect = slide.correct.includes(i);
-            return (
-              <div key={i} className="flex items-center gap-2">
-                {isPilihan && (
-                  <button
-                    type="button"
-                    aria-label={`Tandai opsi ${letter} sebagai jawaban benar`}
-                    aria-pressed={isCorrect}
-                    onClick={() => onChange({
-                      correct: isCorrect
-                        ? slide.correct.filter((c) => c !== i)
-                        : [...slide.correct, i].sort((a, b) => a - b),
-                    })}
-                    className={`flex size-5 shrink-0 cursor-pointer items-center justify-center rounded border-2 ${isCorrect ? 'border-black bg-[#34D399]' : 'border-border'}`}
-                  >
-                    {isCorrect && <CheckIcon className="size-3" />}
-                  </button>
-                )}
-                <span className="w-4 shrink-0 text-center text-sm font-bold">{letter}</span>
-                <Input
-                  value={opt}
-                  onChange={(e) => updateOption(i, e.target.value)}
-                  placeholder={`Opsi ${letter}`}
-                  aria-label={`Opsi ${letter}`}
-                />
-                <HintTooltip label="Hapus opsi ini">
-                  <Button
-                    variant="neutral"
-                    size="icon"
-                    aria-label={`Hapus opsi ${letter}`}
-                    onClick={() => removeOption(i)}
-                    disabled={slide.options.length <= MIN_OPTIONS}
-                    className={`shrink-0 ${dangerButtonClass}`}
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </HintTooltip>
-              </div>
-            );
-          })}
-        </div>
-
-        <Button
-          variant="neutral"
-          onClick={addOption}
-          disabled={slide.options.length >= MAX_OPTIONS}
-          className="w-full"
-        >
-          <PlusIcon />
-          {slide.options.length >= MAX_OPTIONS ? 'Maksimal 6 opsi' : 'Tambah Opsi'}
-        </Button>
+        <OptionList
+          options={slide.options}
+          correct={isPilihan ? slide.correct : undefined}
+          onChange={(patch) => onChange(isPilihan ? patch : { options: patch.options })}
+        />
       </section>
 
       {isPilihan && (
@@ -1521,6 +1542,9 @@ function OptionsEditor({
 // QuizEditor — S13
 // ---------------------------------------------------------------------------
 
+const QUIZ_MIN_DURATION = 10;
+const QUIZ_MAX_DURATION = 120;
+
 function QuizEditor({
   slide,
   onChange,
@@ -1536,133 +1560,84 @@ function QuizEditor({
   }
 
   function updateQuestion(qi: number, patch: Partial<QuizQuestion>) {
-    const next = questions.map((q, i) => (i === qi ? { ...q, ...patch } : q));
-    onChange({ quizQuestions: next });
+    onChange({ quizQuestions: questions.map((q, i) => (i === qi ? { ...q, ...patch } : q)) });
   }
 
   function removeQuestion(qi: number) {
     onChange({ quizQuestions: questions.filter((_, i) => i !== qi) });
   }
 
-  function updateQOption(qi: number, oi: number, value: string) {
-    const q = questions[qi];
-    const opts = q.options.map((o, i) => (i === oi ? value : o));
-    updateQuestion(qi, { options: opts });
-  }
-
-  function addQOption(qi: number) {
-    const q = questions[qi];
-    if (q.options.length >= 6) return;
-    updateQuestion(qi, { options: [...q.options, ''] });
-  }
-
-  function removeQOption(qi: number, oi: number) {
-    const q = questions[qi];
-    if (q.options.length <= 2) return;
-    const opts = q.options.filter((_, i) => i !== oi);
-    const correct = q.correct
-      .map((c) => (c > oi ? c - 1 : c))
-      .filter((c) => c < opts.length);
-    updateQuestion(qi, { options: opts, correct });
-  }
-
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-3">
-          <Label htmlFor="quiz-duration">Durasi per soal (detik)</Label>
-          <Input
+    <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-2">
+        <Label htmlFor="quiz-duration">Durasi per soal</Label>
+        <div className="flex items-center gap-2">
+          <NumberStepper
             id="quiz-duration"
-            type="number"
-            min={10}
-            max={120}
-            step={5}
             value={slide.duration ?? QUIZ_DEFAULT_DURATION}
-            onChange={(e) => onChange({ duration: Number(e.target.value) })}
-            className={`w-24 ${(slide.duration ?? 0) < 10 || (slide.duration ?? 0) > 120 ? 'border-[var(--error)]' : ''
-              }`}
+            min={QUIZ_MIN_DURATION}
+            max={QUIZ_MAX_DURATION}
+            step={5}
+            onChange={(duration) => onChange({ duration })}
+            decrementLabel="Kurangi 5 detik"
+            incrementLabel="Tambah 5 detik"
           />
-          <span className="text-xs text-foreground/70">10–120 dtk</span>
+          <span className="text-sm text-foreground/70">detik</span>
         </div>
-        {((slide.duration ?? 0) < 10 || (slide.duration ?? 0) > 120) && (
-          <p className="text-xs text-[var(--error)]">Durasi harus antara 10–120 detik.</p>
-        )}
-      </div>
+        <PanelNote icon={<AlertCircleIcon className="mt-0.5 size-4 shrink-0" />}>
+          10–120 detik, sama untuk setiap soal. Poin dihitung dari ketepatan dan kecepatan.
+        </PanelNote>
+      </section>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <Label>Soal ({questions.length})</Label>
-          <Button variant="neutral" size="sm" onClick={addQuestion}>
-            <PlusIcon className="size-4 mr-1" />
-            Tambah Soal
-          </Button>
+      <section className="flex flex-col gap-3 border-t-2 border-border/15 pt-4">
+        <div className="flex items-baseline justify-between">
+          <Label>Soal</Label>
+          <span className="text-xs tabular-nums text-foreground/60">{questions.length} soal</span>
         </div>
 
         {questions.length === 0 && (
-          <p className="text-sm text-foreground/70 italic">Tambahkan minimal satu soal.</p>
+          <PanelNote icon={<AlertCircleIcon className="mt-0.5 size-4 shrink-0" />}>
+            Tambahkan minimal satu soal sebelum memulai sesi.
+          </PanelNote>
         )}
 
         {questions.map((q, qi) => (
-          <Card key={q.id} className="border-2">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Soal {qi + 1}</CardTitle>
-                <button onClick={() => removeQuestion(qi)} className="text-foreground/60 hover:text-[var(--error)]">
-                  <Trash2Icon className="size-4" />
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <Input
-                value={q.title}
-                onChange={(e) => updateQuestion(qi, { title: e.target.value })}
-                placeholder="Teks pertanyaan…"
-              />
-              {q.options.map((opt, oi) => (
-                <div key={oi} className="flex items-center gap-2">
-                  <button
-                    onClick={() => updateQuestion(qi, {
-                      correct: q.correct.includes(oi)
-                        ? q.correct.filter((c) => c !== oi)
-                        : [...q.correct, oi].sort((a, b) => a - b),
-                    })}
-                    className={`shrink-0 size-5 rounded border-2 flex items-center justify-center ${q.correct.includes(oi) ? 'bg-[#34D399] border-black' : 'border-border'
-                      }`}
-                    title="Jawaban benar (boleh lebih dari satu)"
-                  >
-                    {q.correct.includes(oi) && <CheckIcon className="size-3" />}
-                  </button>
-                  <span className="shrink-0 w-6 text-sm font-bold text-center">
-                    {String.fromCharCode(65 + oi)}
-                  </span>
-                  <Input
-                    value={opt}
-                    onChange={(e) => updateQOption(qi, oi, e.target.value)}
-                    placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
-                  />
-                  <button
-                    onClick={() => removeQOption(qi, oi)}
-                    disabled={q.options.length <= 2}
-                    className="shrink-0 text-foreground/60 hover:text-[var(--error)] disabled:opacity-20"
-                  >
-                    <Trash2Icon className="size-4" />
-                  </button>
-                </div>
-              ))}
-              <Button
-                variant="neutral"
-                size="sm"
-                onClick={() => addQOption(qi)}
-                disabled={q.options.length >= 6}
-                className="self-start"
-              >
-                <PlusIcon className="size-4 mr-1" />
-                Tambah Opsi
-              </Button>
-            </CardContent>
-          </Card>
+          <div key={q.id} className="flex flex-col gap-3 rounded-base border-2 border-border bg-white p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold">Soal {qi + 1}</span>
+              <HintTooltip label="Hapus soal ini">
+                <Button
+                  variant="neutral"
+                  size="icon"
+                  aria-label={`Hapus soal ${qi + 1}`}
+                  onClick={() => removeQuestion(qi)}
+                  className={dangerButtonClass}
+                >
+                  <Trash2Icon />
+                </Button>
+              </HintTooltip>
+            </div>
+            <Textarea
+              value={q.title}
+              onChange={(e) => updateQuestion(qi, { title: e.target.value })}
+              placeholder="Teks pertanyaan…"
+              aria-label={`Pertanyaan soal ${qi + 1}`}
+              rows={2}
+            />
+            <p className="-mb-1 text-xs text-foreground/60">Centang jawaban benar.</p>
+            <OptionList
+              options={q.options}
+              correct={q.correct}
+              onChange={(patch) => updateQuestion(qi, patch)}
+            />
+          </div>
         ))}
-      </div>
+
+        <Button onClick={addQuestion} className="w-full">
+          <PlusIcon />
+          Tambah Soal
+        </Button>
+      </section>
     </div>
   );
 }

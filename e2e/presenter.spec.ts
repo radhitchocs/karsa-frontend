@@ -223,11 +223,11 @@ test('full presenter + participant flow', async ({ page }) => {
   await page.getByText('Kuis Akhir').first().click();
   await screenshot(page, '04-editor-quiz-slide');
 
-  // Screenshot: duration validation error (enter invalid value 5 → error appears)
+  // Duration stepper clamps out-of-range input to 10–120 on blur
   const durationInput = page.locator('input[type="number"]').first();
   await durationInput.fill('5');
   await durationInput.blur();
-  await page.waitForSelector('text=Durasi harus', { timeout: 3_000 });
+  await expect(durationInput).toHaveValue('10');
   await screenshot(page, '04b-editor-duration-error');
   await durationInput.fill('10');
   await durationInput.blur();
