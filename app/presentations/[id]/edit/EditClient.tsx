@@ -70,7 +70,7 @@ import {
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
 import type { Editor } from '@tiptap/react';
-import { RichTextField, RichTextToolbar, pillBase, pillButton, pillGroup } from './RichTextEditor';
+import { RichTextField, RichTextToolbar, UnavailableHint, pillBase, pillButton, pillGroup } from './RichTextEditor';
 import { PanelNote, SettingsPanel, SlideCanvas, canvasFrameClass } from './SlideCanvas';
 
 type PresentationDetail = {
@@ -977,7 +977,7 @@ function SlideSettings({
             incrementLabel="Tambah kelompok"
           />
           <PanelNote icon={<AlertCircleIcon className="mt-0.5 size-4 shrink-0" />}>
-            2–20 kelompok. Bisa diubah lagi saat sesi sebelum dibagikan.
+            Atur 2–20 kelompok. Bisa diubah lagi saat sesi sebelum dibagikan.
           </PanelNote>
         </div>
       );
@@ -1082,12 +1082,17 @@ function SlideEditorHeader({
       </span>
       {/* Fixed-width controls pinned right so they sit in the same spot on every slide type. */}
       <div className="ml-auto flex items-center gap-2">
-        <RichTextToolbar editor={isMateri ? activeEditor : null} />
-        <LayoutPicker
-          value={slide.layout}
-          disabled={!isMateri}
-          onChange={(layout) => onChange({ layout })}
+        <RichTextToolbar
+          editor={isMateri ? activeEditor : null}
+          unavailableHint={isMateri ? undefined : 'Format teks hanya tersedia untuk slide Materi'}
         />
+        <UnavailableHint hint={isMateri ? undefined : 'Layout hanya tersedia untuk slide Materi'}>
+          <LayoutPicker
+            value={slide.layout}
+            disabled={!isMateri}
+            onChange={(layout) => onChange({ layout })}
+          />
+        </UnavailableHint>
         <Tooltip disableHoverablePopup>
           <TooltipTrigger
             render={

@@ -92,10 +92,28 @@ export function RichTextField({
 }
 
 /** Formatting buttons for whichever field was focused last. Lists only apply to the body. */
-export function RichTextToolbar({ editor }: { editor: Editor | null }) {
+/**
+ * Wrap a whole pill group in a tooltip explaining why it's unavailable. Disabled buttons get no
+ * hover events, so the hint sits on a wrapper and the buttons inside stop catching the pointer.
+ */
+export function UnavailableHint({ hint, children }: { hint?: string; children: React.ReactNode }) {
+  if (!hint) return <>{children}</>;
+  return (
+    <Tooltip disableHoverablePopup>
+      <TooltipTrigger render={<div className="inline-flex [&_button]:pointer-events-none" />}>{children}</TooltipTrigger>
+      <TooltipContent side="bottom" className="pointer-events-none">{hint}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function RichTextToolbar({ editor, unavailableHint }: { editor: Editor | null; unavailableHint?: string }) {
   // useEditorState only recomputes on the watched editor's transactions, so a
   // focus switch would leave stale state; remount per editor instead.
-  return <ToolbarButtons key={editor?.instanceId ?? 'none'} editor={editor} />;
+  return (
+    <UnavailableHint hint={unavailableHint}>
+      <ToolbarButtons key={editor?.instanceId ?? 'none'} editor={editor} />
+    </UnavailableHint>
+  );
 }
 
 function ToolbarButtons({ editor }: { editor: Editor | null }) {
