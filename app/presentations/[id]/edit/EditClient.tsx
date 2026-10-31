@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   PlusIcon,
@@ -200,7 +200,11 @@ export function EditClient() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [dragStep, setDragStep] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [activeTab, setActiveTab] = useState<'edit' | 'results'>('edit');
+  // ?tab=hasil (e.g. from the home card menu) opens straight on the results tab
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'edit' | 'results'>(
+    searchParams.get('tab') === 'hasil' ? 'results' : 'edit',
+  );
 
   // Track last saved version for optimistic locking
   const lastSavedVersionRef = useRef<number | null>(null);

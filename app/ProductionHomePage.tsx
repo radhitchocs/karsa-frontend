@@ -4,7 +4,16 @@ import { useEffect, useState } from 'react';
 import { AppHeader } from '@/components/AppHeader';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, PencilIcon, PlayIcon, Trash2Icon } from 'lucide-react';
+import { BarChart3Icon, MoreVerticalIcon, PlusIcon, PencilIcon, PlayIcon, Trash2Icon } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -63,6 +72,9 @@ export function ProductionHomePage() {
       toast.add({ title: 'Gagal membuat presentasi', description: err.message, type: 'error' });
     },
   });
+
+  // Presentation awaiting delete confirmation (from the card's ⋯ menu)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
@@ -183,41 +195,100 @@ export function ProductionHomePage() {
                   )}
                 </CardHeader>
                 <CardContent className="flex gap-2 pt-0">
-                  <Button
-                    variant="neutral"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => router.push(`/presentations/${p.id}/edit`)}
-                  >
-                    <PencilIcon className="size-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    disabled={startMutation.isPending}
-                    onClick={() => startMutation.mutate(p.id)}
-                  >
-                    <PlayIcon className="size-3 mr-1" />
-                    Mulai
-                  </Button>
-                  <Button
-                    variant="neutral"
-                    size="icon"
-                    className="shrink-0"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => {
-                      if (confirm(`Hapus "${p.title}"?`)) deleteMutation.mutate(p.id);
-                    }}
-                  >
-                    <Trash2Icon className="size-4" />
-                  </Button>
+                  <Tooltip disableHoverablePopup>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="neutral"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/presentations/${p.id}/edit`)}
+                        />
+                      }
+                    >
+                      <PencilIcon className="size-3" />
+                      Ubah
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="pointer-events-none">Ubah slide presentasi</TooltipContent>
+                  </Tooltip>
+                  <Tooltip disableHoverablePopup>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          disabled={startMutation.isPending}
+                          onClick={() => startMutation.mutate(p.id)}
+                        />
+                      }
+                    >
+                      <PlayIcon className="size-3" />
+                      Mulai
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="pointer-events-none">Mulai sesi presentasi</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenu>
+                    <Tooltip disableHoverablePopup>
+                      <TooltipTrigger
+                        render={
+                          <DropdownMenuTrigger
+                            render={
+                              <Button variant="neutral" size="icon" className="shrink-0" aria-label={`Menu ${p.title}`} />
+                            }
+                          />
+                        }
+                      >
+                        <MoreVerticalIcon />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="pointer-events-none">Lainnya</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent side="bottom" align="end" className="min-w-36 p-0.5">
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/presentations/${p.id}/edit?tab=hasil`)}
+                        className="cursor-pointer gap-1.5 px-1.5 py-1 text-xs [&_svg]:size-3"
+                      >
+                        <BarChart3Icon /> Lihat Hasil
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setDeleteTarget({ id: p.id, title: p.title })}
+                        className="cursor-pointer gap-1.5 px-1.5 py-1 text-xs [&_svg]:size-3 text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-white hover:border-border focus:bg-[var(--error)] focus:text-white focus:border-border data-highlighted:bg-[var(--error)] data-highlighted:text-black data-highlighted:border-border"
+                      >
+                        <Trash2Icon /> Hapus
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
       </div>
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus presentasi?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-foreground/70">
+            &ldquo;{deleteTarget?.title}&rdquo; akan dihapus. Tindakan ini tidak dapat dibatalkan.
+          </p>
+          <DialogFooter>
+            <DialogClose render={<Button variant="neutral" size="sm" />}>Batal</DialogClose>
+            <Button
+              size="sm"
+              className="border-2 border-border bg-[var(--error)] text-black hover:bg-[var(--error)]/90"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
