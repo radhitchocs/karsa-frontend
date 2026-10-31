@@ -25,6 +25,7 @@ export const titleExtensions: Extensions = [
   StarterKit.configure({
     ...baseKit,
     document: false,
+    bold: false, // title is always bold via its styling
     bulletList: false,
     orderedList: false,
     listItem: false,
@@ -41,6 +42,21 @@ export const bodyExtensions: Extensions = [StarterKit.configure(baseKit)];
  */
 export const richTextClass =
   '[&_p]:min-h-[1lh] [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-[1.5em] [&_ol]:pl-[1.5em] [&_li>p]:min-h-0';
+
+/** Marks each kind may not hold (title is always bold). */
+const disallowedMarks = { title: ['bold'], body: [] as string[] } as const;
+
+/** Drop marks the kind's schema lacks, so docs saved before a schema change still load. */
+export function sanitizeDoc(doc: RichNode, kind: 'title' | 'body'): RichNode {
+  const banned: readonly string[] = disallowedMarks[kind];
+  if (!banned.length) return doc;
+  const walk = (node: RichNode): RichNode => ({
+    ...node,
+    ...(node.marks ? { marks: node.marks.filter((m) => !banned.includes(m.type)) } : {}),
+    ...(node.content ? { content: node.content.map(walk) } : {}),
+  });
+  return walk(doc);
+}
 
 /** Plain text → doc, one paragraph per line. Used to seed the editor from legacy slides. */
 export function plainToDoc(text: string, kind: 'title' | 'body'): JSONContent {
@@ -78,7 +94,7 @@ export function RichText({
   if (doc) {
     try {
       rendered = renderToReactElement({
-        content: doc as JSONContent,
+        content: sanitizeDoc(doc, kind) as JSONContent,
         extensions: kind === 'title' ? titleExtensions : bodyExtensions,
         ...(kind === 'title' ? { options: titleOptions } : {}),
       });

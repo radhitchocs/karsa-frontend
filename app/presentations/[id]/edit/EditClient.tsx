@@ -499,6 +499,7 @@ export function EditClient() {
                 slide={selected}
                 index={selectedIndex}
                 onChange={(patch) => updateSlide(selectedIndex, patch)}
+                onDelete={() => setDeleteConfirmSlideId(selected.id)}
               />
             )}
           </div>
@@ -877,21 +878,43 @@ function SlideEditor({
   slide,
   index,
   onChange,
+  onDelete,
 }: {
   slide: Slide;
   index: number;
   onChange: (patch: Partial<Slide>) => void;
+  onDelete: () => void;
 }) {
+  // Last-focused materi text field; drives the formatting toolbar in the header row.
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
+
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
       <div className="flex items-center gap-2">
         <Badge className={`${kindColors[slide.type]} border`}>{labels[slide.type]}</Badge>
         <span className="text-xs text-foreground/60">Slide {index + 1}</span>
+        {slide.type === 'materi' && (
+          <div className="ml-2 border-l-2 border-border pl-3">
+            <RichTextToolbar editor={activeEditor} />
+          </div>
+        )}
+        <Button
+          variant="neutral"
+          size="sm"
+          className="ml-auto text-[var(--error-fg)]"
+          onClick={onDelete}
+          data-testid="slide-editor-delete"
+        >
+          <Trash2Icon className="size-4" />
+          Hapus
+        </Button>
       </div>
 
       {/* C2: Materi canvas — inline WYSIWYG */}
       {slide.type === 'materi' ? (
-        <MateriCanvas slide={slide} onChange={onChange} />
+        <MateriCanvas slide={slide} onChange={onChange} onEditorFocus={setActiveEditor}
+          onEditorBlur={(e) => setActiveEditor((cur) => (cur === e ? null : cur))}
+        />
       ) : (
         <>
           {/* Common: title (form for non-materi) */}
@@ -955,12 +978,15 @@ function SlideEditor({
 function MateriCanvas({
   slide,
   onChange,
+  onEditorFocus,
+  onEditorBlur,
 }: {
   slide: Slide;
   onChange: (patch: Partial<Slide>) => void;
+  onEditorFocus: (editor: Editor) => void;
+  onEditorBlur: (editor: Editor) => void;
 }) {
   const layout = slide.layout ?? 'teks';
-  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -992,9 +1018,6 @@ function MateriCanvas({
 
       {/* Canvas */}
       <div className="border-2 border-border rounded-base bg-white shadow-[4px_4px_0px_0px_var(--border)] overflow-hidden">
-        <div className="border-b-2 border-border bg-secondary-background px-3 py-2">
-          <RichTextToolbar editor={activeEditor} />
-        </div>
         <div
           className={`p-6 min-h-[280px] flex gap-4 ${layout === 'teks' ? 'flex-col' : 'flex-row items-start'
             }`}
@@ -1009,7 +1032,8 @@ function MateriCanvas({
               testId="canvas-title"
               className="text-2xl font-bold text-foreground outline-none border-b-2 border-transparent focus:border-main pb-1 min-h-[2.5rem]"
               onChange={(titleDoc, title) => onChange({ titleDoc, title })}
-              onFocus={setActiveEditor}
+              onFocus={onEditorFocus}
+              onBlur={onEditorBlur}
             />
             <RichTextField
               kind="body"
@@ -1019,7 +1043,8 @@ function MateriCanvas({
               testId="canvas-body"
               className="text-base text-foreground/70 outline-none min-h-[5rem]"
               onChange={(bodyDoc, body) => onChange({ bodyDoc, body })}
-              onFocus={setActiveEditor}
+              onFocus={onEditorFocus}
+              onBlur={onEditorBlur}
             />
           </div>
 

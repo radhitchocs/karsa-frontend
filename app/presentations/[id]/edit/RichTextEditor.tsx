@@ -9,6 +9,7 @@ import {
   bodyExtensions,
   plainToDoc,
   richTextClass,
+  sanitizeDoc,
   titleExtensions,
 } from '@/features/shared/rich-text';
 
@@ -40,6 +41,7 @@ export function RichTextField({
   testId,
   onChange,
   onFocus,
+  onBlur,
 }: {
   kind: 'title' | 'body';
   doc?: RichNode;
@@ -49,11 +51,12 @@ export function RichTextField({
   testId?: string;
   onChange: (doc: RichNode, text: string) => void;
   onFocus?: (editor: Editor) => void;
+  onBlur?: (editor: Editor) => void;
 }) {
   // Keep handlers fresh: the slide's index (baked into onChange) can change on reorder.
-  const handlers = useRef({ onChange, onFocus });
+  const handlers = useRef({ onChange, onFocus, onBlur });
   useLayoutEffect(() => {
-    handlers.current = { onChange, onFocus };
+    handlers.current = { onChange, onFocus, onBlur };
   });
 
   const editor = useEditor({
@@ -62,7 +65,7 @@ export function RichTextField({
       ...(kind === 'title' ? titleExtensions : bodyExtensions),
       Placeholder.configure({ placeholder }),
     ],
-    content: doc ?? plainToDoc(text, kind),
+    content: doc ? sanitizeDoc(doc, kind) : plainToDoc(text, kind),
     editorProps: {
       attributes: {
         class: `outline-none ${richTextClass} ${placeholderClass} ${className}`,
@@ -71,6 +74,7 @@ export function RichTextField({
     },
     onUpdate: ({ editor }) => handlers.current.onChange(editor.getJSON() as RichNode, plainText(editor)),
     onFocus: ({ editor }) => handlers.current.onFocus?.(editor),
+    onBlur: ({ editor }) => handlers.current.onBlur?.(editor),
   });
 
   return <EditorContent editor={editor} data-testid={testId} />;
@@ -89,7 +93,9 @@ function ToolbarButtons({ editor }: { editor: Editor | null }) {
     selector: ({ editor: e }) =>
       e
         ? {
-            bold: e.isActive('bold'),
+            // Schema without bold (title): show bold as permanently on.
+            boldFixed: !e.schema.marks.bold,
+            bold: !e.schema.marks.bold || e.isActive('bold'),
             italic: e.isActive('italic'),
             underline: e.isActive('underline'),
             bulletList: e.isActive('bulletList'),
@@ -110,7 +116,8 @@ function ToolbarButtons({ editor }: { editor: Editor | null }) {
   return (
     <div role="toolbar" aria-label="Format teks" className="flex items-center gap-1" data-testid="rich-toolbar">
       {buttons.map(({ key, label, icon: Icon, run, ...rest }) => {
-        const disabled = !editor || !state || ('list' in rest && !state.lists);
+        const disabled =
+          !editor || !state || ('list' in rest && !state.lists) || (key === 'bold' && state.boldFixed);
         const active = !!state?.[key];
         return (
           <button
@@ -123,9 +130,9 @@ function ToolbarButtons({ editor }: { editor: Editor | null }) {
             // Keep focus (and selection) in the editor while clicking.
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor && run(editor)}
-            className={`inline-flex size-8 items-center justify-center rounded-base border-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${active
+            className={`inline-flex size-8 items-center justify-center rounded-base border-2 cursor-pointer disabled:cursor-not-allowed ${active
               ? 'border-foreground bg-foreground text-background'
-              : 'border-border bg-secondary-background hover:bg-gray-100'
+              : 'border-border bg-secondary-background hover:bg-gray-100 disabled:opacity-40'
               }`}
             data-testid={`rich-${key}`}
           >
