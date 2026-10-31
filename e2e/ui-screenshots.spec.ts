@@ -188,7 +188,7 @@ test('shot: editor materi layouts', async ({ page }) => {
 
   // Select the first slide (Pengantar — materi)
   await page.locator('aside').getByText('Pengantar').click();
-  await page.waitForSelector('text=Layout', { timeout: 5_000 });
+  await page.waitForSelector('[role="group"][aria-label="Layout"]', { timeout: 5_000 });
 
   // Teks layout (default)
   await page.getByRole('button', { name: 'Teks', exact: true }).click();

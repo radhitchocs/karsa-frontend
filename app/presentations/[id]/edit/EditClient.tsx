@@ -67,7 +67,7 @@ import {
 import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
 import type { Editor } from '@tiptap/react';
-import { RichTextField, RichTextToolbar } from './RichTextEditor';
+import { RichTextField, RichTextToolbar, pillBase, pillButton, pillGroup } from './RichTextEditor';
 
 type PresentationDetail = {
   id: string;
@@ -113,7 +113,7 @@ const kindColors: Record<Kind, string> = {
   tanya: 'bg-[#FF8FCB]',
   kelompok: 'bg-[#2DD4BF]',
   kuis: 'bg-[#B8F25B]',
-  pancing:  'bg-[#FF6B6B]',
+  pancing: 'bg-[#FF6B6B]',
 };
 
 const kindIcons: Record<Kind, React.ReactNode> = {
@@ -498,6 +498,7 @@ export function EditClient() {
                 key={selected.id}
                 slide={selected}
                 index={selectedIndex}
+                total={slides.length}
                 onChange={(patch) => updateSlide(selectedIndex, patch)}
                 onDelete={() => setDeleteConfirmSlideId(selected.id)}
               />
@@ -877,11 +878,13 @@ function ResultsArea({ presentationId }: { presentationId: string }) {
 function SlideEditor({
   slide,
   index,
+  total,
   onChange,
   onDelete,
 }: {
   slide: Slide;
   index: number;
+  total: number;
   onChange: (patch: Partial<Slide>) => void;
   onDelete: () => void;
 }) {
@@ -890,25 +893,14 @@ function SlideEditor({
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <Badge className={`${kindColors[slide.type]} border`}>{labels[slide.type]}</Badge>
-        <span className="text-xs text-foreground/60">Slide {index + 1}</span>
-        {slide.type === 'materi' && (
-          <div className="ml-2 border-l-2 border-border pl-3">
-            <RichTextToolbar editor={activeEditor} />
-          </div>
-        )}
-        <Button
-          variant="neutral"
-          size="sm"
-          className="ml-auto text-[var(--error-fg)]"
-          onClick={onDelete}
-          data-testid="slide-editor-delete"
-        >
-          <Trash2Icon className="size-4" />
-          Hapus
-        </Button>
-      </div>
+      <SlideEditorHeader
+        slide={slide}
+        index={index}
+        total={total}
+        activeEditor={activeEditor}
+        onChange={onChange}
+        onDelete={onDelete}
+      />
 
       {/* C2: Materi canvas — inline WYSIWYG */}
       {slide.type === 'materi' ? (
@@ -972,6 +964,139 @@ function SlideEditor({
 }
 
 // ---------------------------------------------------------------------------
+// SlideEditorHeader — row of separate pills: type, slide number, text format,
+// layout (materi only) and delete
+// ---------------------------------------------------------------------------
+
+function SlideEditorHeader({
+  slide,
+  index,
+  total,
+  activeEditor,
+  onChange,
+  onDelete,
+}: {
+  slide: Slide;
+  index: number;
+  total: number;
+  activeEditor: Editor | null;
+  onChange: (patch: Partial<Slide>) => void;
+  onDelete: () => void;
+}) {
+  const isMateri = slide.type === 'materi';
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span
+        className={`${pillBase} bg-secondary-background px-4 text-sm font-semibold tabular-nums`}
+        aria-label={`Slide ${index + 1} dari ${total}`}
+      >
+        {index + 1} / {total}
+      </span>
+      <span className={`${pillBase} px-4 text-sm font-bold ${kindColors[slide.type]}`}>
+        {labels[slide.type]}
+      </span>
+      {/* Fixed-width controls pinned right so they sit in the same spot on every slide type. */}
+      <div className="ml-auto flex items-center gap-2">
+        <RichTextToolbar editor={isMateri ? activeEditor : null} />
+        <LayoutPicker
+          value={slide.layout}
+          disabled={!isMateri}
+          onChange={(layout) => onChange({ layout })}
+        />
+        <Tooltip disableHoverablePopup>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="neutral"
+                size="icon"
+                aria-label="Hapus slide"
+                onClick={onDelete}
+                className="rounded-full text-[var(--error-fg)] hover:bg-[var(--error)] hover:text-black cursor-pointer"
+                data-testid="slide-editor-delete"
+              />
+            }
+          >
+            <Trash2Icon className="size-4" />
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="pointer-events-none">Hapus slide</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LayoutPicker — materi layout toggle, compact icons for the editor header row
+// ---------------------------------------------------------------------------
+
+type MateriLayout = 'teks' | 'teks-gambar' | 'dua-gambar-lr' | 'dua-gambar-tb';
+
+const layoutOptions: { value: MateriLayout; label: string }[] = [
+  { value: 'teks', label: 'Teks' },
+  { value: 'teks-gambar', label: 'Teks + Gambar' },
+  { value: 'dua-gambar-lr', label: 'Dua Gambar (Sejajar)' },
+  { value: 'dua-gambar-tb', label: 'Dua Gambar (Bertumpuk)' },
+];
+
+/** Mini diagram of a layout: lines are text, filled blocks are images. */
+function LayoutGlyph({ layout }: { layout: MateriLayout }) {
+  const line = (x1: number, x2: number, y: number) => (
+    <line x1={x1} x2={x2} y1={y} y2={y} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+  );
+  const img = (x: number, y: number, w: number, h: number) => (
+    <rect x={x} y={y} width={w} height={h} rx={1} fill="currentColor" />
+  );
+  return (
+    <svg viewBox="0 0 20 14" className="w-5 h-3.5" aria-hidden="true">
+      {layout === 'teks' && <>{line(2, 18, 3)}{line(2, 15, 7)}{line(2, 12, 11)}</>}
+      {layout === 'teks-gambar' && <>{line(2, 10, 4)}{line(2, 9, 7.5)}{line(2, 8, 11)}{img(12, 2, 6, 10)}</>}
+      {layout === 'dua-gambar-lr' && <>{line(2, 18, 2.5)}{img(2, 5.5, 7.5, 7)}{img(10.5, 5.5, 7.5, 7)}</>}
+      {layout === 'dua-gambar-tb' && <>{line(2, 9, 4)}{line(2, 8, 7.5)}{line(2, 7, 11)}{img(11, 1, 7, 5.5)}{img(11, 7.5, 7, 5.5)}</>}
+    </svg>
+  );
+}
+
+function LayoutPicker({
+  value,
+  disabled = false,
+  onChange,
+}: {
+  value: Slide['layout'];
+  disabled?: boolean;
+  onChange: (layout: MateriLayout) => void;
+}) {
+  // Legacy 'dua-gambar' is the side-by-side layout.
+  const current = !value ? 'teks' : value === 'dua-gambar' ? 'dua-gambar-lr' : value;
+  return (
+    <div role="group" aria-label="Layout" className={pillGroup}>
+      {layoutOptions.map(({ value: l, label }) => {
+        const active = !disabled && current === l;
+        return (
+          <Tooltip key={l} disableHoverablePopup>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={label}
+                  aria-pressed={active}
+                  disabled={disabled}
+                  onClick={() => onChange(l)}
+                  className={pillButton(active)}
+                  data-testid={`layout-${l}`}
+                />
+              }
+            >
+              <LayoutGlyph layout={l} />
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="pointer-events-none">{label}</TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // MateriCanvas — C2: WYSIWYG for materi slides
 // ---------------------------------------------------------------------------
 
@@ -990,32 +1115,6 @@ function MateriCanvas({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Layout selector */}
-      <div className="flex flex-col gap-2">
-        <Label>Layout</Label>
-        <div className="flex flex-wrap gap-2">
-          {(['teks', 'teks-gambar', 'dua-gambar-lr', 'dua-gambar-tb'] as const).map((l) => {
-            const isActive = layout === l || (l === 'dua-gambar-lr' && layout === 'dua-gambar');
-            return (
-              <button
-                key={l}
-                onClick={() => onChange({ layout: l })}
-                className={`px-3 py-1.5 border-2 rounded-base text-sm font-medium ${isActive ? 'border-foreground bg-foreground text-background shadow-[2px_2px_0_0_#000]' : 'border-border bg-secondary-background'
-                  }`}
-              >
-                {l === 'teks'
-                  ? 'Teks'
-                  : l === 'teks-gambar'
-                    ? 'Teks + Gambar'
-                    : l === 'dua-gambar-lr'
-                      ? 'Dua Gambar (Sejajar)'
-                      : 'Dua Gambar (Bertumpuk)'}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Canvas */}
       <div className="border-2 border-border rounded-base bg-white shadow-[4px_4px_0px_0px_var(--border)] overflow-hidden">
         <div

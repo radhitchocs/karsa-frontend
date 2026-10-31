@@ -513,7 +513,7 @@ test('editor shows presentation with all slide types', async ({ page }) => {
   // ── AC26: three materi layout variants + two independent image slots ──────
   // Select the Materi slide (first slide in the list) — editor uses div, not button
   await page.locator('aside').getByText('Selamat Datang').click();
-  await page.waitForSelector('text=Layout', { timeout: 5_000 });
+  await page.waitForSelector('[role="group"][aria-label="Layout"]', { timeout: 5_000 });
 
   // Verify three layout buttons exist (exact: true avoids 'Teks' matching 'Teks + Gambar')
   await expect(page.getByRole('button', { name: 'Teks', exact: true })).toBeVisible();

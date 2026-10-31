@@ -335,7 +335,7 @@ test('C1 — valid image upload shows on canvas; non-image → 422; >5 MB → 42
   await page.click(`[data-testid="slide-item-${materiIdx}"]`);
 
   // Click "Teks + Gambar" layout button
-  await page.click('button:has-text("Teks + Gambar")');
+  await page.getByRole('button', { name: 'Teks + Gambar', exact: true }).click();
   await page.waitForSelector('[data-testid="image-slot-0"]', { timeout: 5_000 });
 
   // --- valid image: 1x1 PNG ---

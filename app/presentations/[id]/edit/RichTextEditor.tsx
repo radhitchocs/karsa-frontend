@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import { Placeholder } from '@tiptap/extensions';
 import { BoldIcon, ItalicIcon, ListIcon, ListOrderedIcon, UnderlineIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { RichNode } from '@/domain/model';
 import {
   bodyExtensions,
@@ -12,6 +13,16 @@ import {
   sanitizeDoc,
   titleExtensions,
 } from '@/features/shared/rich-text';
+
+export const pillBase =
+  'inline-flex h-10 shrink-0 items-center rounded-full border-2 border-border shadow-[2px_2px_0_0_var(--border)]';
+export const pillGroup = `${pillBase} gap-0.5 bg-secondary-background px-1`;
+export function pillButton(active: boolean): string {
+  return `inline-flex size-8 items-center justify-center rounded-full cursor-pointer disabled:cursor-default aria-disabled:cursor-default transition-colors ${active
+    ? 'bg-foreground text-background'
+    : 'hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent'
+    }`;
+}
 
 const placeholderClass =
   "[&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)] [&_p.is-editor-empty:first-child]:before:float-left [&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:text-foreground/50";
@@ -93,15 +104,15 @@ function ToolbarButtons({ editor }: { editor: Editor | null }) {
     selector: ({ editor: e }) =>
       e
         ? {
-            // Schema without bold (title): show bold as permanently on.
-            boldFixed: !e.schema.marks.bold,
-            bold: !e.schema.marks.bold || e.isActive('bold'),
-            italic: e.isActive('italic'),
-            underline: e.isActive('underline'),
-            bulletList: e.isActive('bulletList'),
-            orderedList: e.isActive('orderedList'),
-            lists: !!e.schema.nodes.bulletList,
-          }
+          // Schema without bold (title): show bold as permanently on.
+          boldFixed: !e.schema.marks.bold,
+          bold: !e.schema.marks.bold || e.isActive('bold'),
+          italic: e.isActive('italic'),
+          underline: e.isActive('underline'),
+          bulletList: e.isActive('bulletList'),
+          orderedList: e.isActive('orderedList'),
+          lists: !!e.schema.nodes.bulletList,
+        }
         : null,
   });
 
@@ -114,30 +125,35 @@ function ToolbarButtons({ editor }: { editor: Editor | null }) {
   ] as const;
 
   return (
-    <div role="toolbar" aria-label="Format teks" className="flex items-center gap-1" data-testid="rich-toolbar">
+    <div role="toolbar" aria-label="Format teks" className={pillGroup} data-testid="rich-toolbar">
       {buttons.map(({ key, label, icon: Icon, run, ...rest }) => {
-        const disabled =
-          !editor || !state || ('list' in rest && !state.lists) || (key === 'bold' && state.boldFixed);
+        const disabled = !editor || !state || ('list' in rest && !state.lists);
+        // Title bold is locked on: aria-disabled (not native disabled) so the tooltip can still explain why.
+        const locked = key === 'bold' && !!state?.boldFixed;
+        const tip = locked ? 'Judul selalu tebal' : label;
         const active = !!state?.[key];
         return (
-          <button
-            key={key}
-            type="button"
-            aria-label={label}
-            title={label}
-            aria-pressed={active}
-            disabled={disabled}
-            // Keep focus (and selection) in the editor while clicking.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor && run(editor)}
-            className={`inline-flex size-8 items-center justify-center rounded-base border-2 cursor-pointer disabled:cursor-not-allowed ${active
-              ? 'border-foreground bg-foreground text-background'
-              : 'border-border bg-secondary-background hover:bg-gray-100 disabled:opacity-40'
-              }`}
-            data-testid={`rich-${key}`}
-          >
-            <Icon className="size-4" />
-          </button>
+          <Tooltip key={key} disableHoverablePopup>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={tip}
+                  aria-pressed={active}
+                  aria-disabled={locked || undefined}
+                  disabled={disabled}
+                  // Keep focus (and selection) in the editor while clicking.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => !locked && editor && run(editor)}
+                  className={pillButton(active)}
+                  data-testid={`rich-${key}`}
+                />
+              }
+            >
+              <Icon className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="pointer-events-none">{tip}</TooltipContent>
+          </Tooltip>
         );
       })}
     </div>
