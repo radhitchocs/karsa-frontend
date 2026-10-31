@@ -1,0 +1,93 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { KarsaWordmark } from '@/components/KarsaWordmark';
+import { apiFetch } from '@/lib/api';
+import { setToken } from '@/lib/auth';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await apiFetch<{ accessToken: string }>(
+        '/api/auth/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        },
+      );
+      setToken(res.accessToken);
+      router.push('/');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="flex flex-1 items-center justify-center p-6">
+      <div className="flex flex-col items-center gap-6 w-full max-w-sm">
+        <KarsaWordmark size="md" />
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="text-2xl">Masuk</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="password">Kata sandi</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+              {error && (
+                <p data-testid="login-error" className="text-sm font-medium border-2 border-[var(--error)] bg-secondary-background text-foreground px-3 py-2 rounded-base">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? 'Memuat…' : 'Masuk'}
+              </Button>
+              <p className="text-center text-sm text-foreground/60">
+                Belum punya akun?{' '}
+                <a href="/register" className="underline font-medium">
+                  Daftar
+                </a>
+              </p>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  );
+}
