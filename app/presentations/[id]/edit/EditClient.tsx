@@ -68,6 +68,7 @@ import { QUIZ_DEFAULT_DURATION } from '@/domain/quiz-config';
 import { SlidePreview } from '@/features/shared/SlidePreview';
 import type { Editor } from '@tiptap/react';
 import { RichTextField, RichTextToolbar, pillBase, pillButton, pillGroup } from './RichTextEditor';
+import { PanelNote, SettingsPanel, SlideCanvas, canvasFrameClass } from './SlideCanvas';
 
 type PresentationDetail = {
   id: string;
@@ -892,76 +893,145 @@ function SlideEditor({
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
-      <SlideEditorHeader
-        slide={slide}
-        index={index}
-        total={total}
-        activeEditor={activeEditor}
-        onChange={onChange}
-        onDelete={onDelete}
-      />
-
-      {/* Form fills the space under the header and sits vertically centered; taller forms just grow and scroll. */}
-      <div className="flex flex-1 flex-col justify-center gap-6 py-6">
-        {/* C2: Materi canvas — inline WYSIWYG */}
-        {slide.type === 'materi' ? (
-          <MateriCanvas slide={slide} onChange={onChange} onEditorFocus={setActiveEditor}
-            onEditorBlur={(e) => setActiveEditor((cur) => (cur === e ? null : cur))}
-          />
-        ) : (
-          <>
-            {/* Common: title (form for non-materi) */}
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="slide-title">Judul *</Label>
-              <Input
-                id="slide-title"
-                value={slide.title}
-                onChange={(e) => onChange({ title: e.target.value })}
-                placeholder="Judul slide"
-              />
-            </div>
-
-            {/* Common: body (most types) */}
-            {['pilihan', 'polling', 'awan', 'tanya'].includes(slide.type) && (
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="slide-body">Deskripsi / Pertanyaan</Label>
-                <Textarea
-                  id="slide-body"
-                  value={slide.body}
-                  onChange={(e) => onChange({ body: e.target.value })}
-                  placeholder="Isi slide…"
-                  rows={3}
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Type-specific editors */}
-        {(slide.type === 'pilihan' || slide.type === 'polling') && (
-          <OptionsEditor slide={slide} onChange={onChange} />
-        )}
-
-        {slide.type === 'kelompok' && (
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="slide-groups">Jumlah kelompok default</Label>
-            <Input
-              id="slide-groups"
-              type="number"
-              min={2}
-              max={20}
-              value={slide.groups}
-              onChange={(e) => onChange({ groups: Number(e.target.value) })}
-              className="w-24"
-            />
-          </div>
-        )}
-
-        {slide.type === 'kuis' && (
-          <QuizEditor slide={slide} onChange={onChange} />
-        )}
+    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col">
+      {/* Header keeps its original 672px width, centered above the wider canvas + panel. */}
+      <div className="mx-auto w-full max-w-2xl">
+        <SlideEditorHeader
+          slide={slide}
+          index={index}
+          total={total}
+          activeEditor={activeEditor}
+          onChange={onChange}
+          onDelete={onDelete}
+        />
       </div>
+
+      {/* Same structure for every type: 16:9 canvas (content) left, settings panel right. */}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_20rem] gap-6 pt-6 pb-1">
+        {/* Canvas column scrolls on its own if the canvas outgrows the space; pr/pb leave room for the shadow. */}
+        <div className="flex min-h-0 flex-col overflow-y-auto pr-1 pb-1">
+          <div className="my-auto">
+            {slide.type === 'materi' ? (
+              <MateriCanvas
+                slide={slide}
+                onChange={onChange}
+                onEditorFocus={setActiveEditor}
+                onEditorBlur={(e) => setActiveEditor((cur) => (cur === e ? null : cur))}
+              />
+            ) : (
+              <SlideCanvas slide={slide} onChange={onChange} />
+            )}
+          </div>
+        </div>
+
+        <SettingsPanel>
+          <SlideSettings slide={slide} onChange={onChange} />
+        </SettingsPanel>
+      </div>
+    </div>
+  );
+}
+
+/** Type-specific settings shown in the right-hand panel. */
+function SlideSettings({
+  slide,
+  onChange,
+}: {
+  slide: Slide;
+  onChange: (patch: Partial<Slide>) => void;
+}) {
+  switch (slide.type) {
+    case 'materi':
+      return <MateriImageSettings slide={slide} onChange={onChange} />;
+    case 'pilihan':
+    case 'polling':
+      return <OptionsEditor slide={slide} onChange={onChange} />;
+    case 'awan':
+      return (
+        <PanelNote>
+          Peserta mengirim maksimal tiga frasa, masing-masing maksimal 40 karakter. Frasa yang sama
+          digabung; ukurannya mengikuti frekuensi.
+        </PanelNote>
+      );
+    case 'tanya':
+      return (
+        <PanelNote>
+          Peserta mengirim pertanyaan (maksimal 300 karakter). Anda memilih pertanyaan yang ditampilkan
+          di proyektor saat sesi.
+        </PanelNote>
+      );
+    case 'kelompok':
+      return (
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="slide-groups">Jumlah kelompok default</Label>
+          <Input
+            id="slide-groups"
+            type="number"
+            min={2}
+            max={20}
+            value={slide.groups}
+            onChange={(e) => onChange({ groups: Number(e.target.value) })}
+            className="w-24"
+          />
+        </div>
+      );
+    case 'pancing':
+      return (
+        <PanelNote>
+          Saat sesi, Anda memancing peserta secara acak untuk menjawab. Tidak ada pengaturan tambahan.
+        </PanelNote>
+      );
+    case 'kuis':
+      return <QuizEditor slide={slide} onChange={onChange} />;
+  }
+}
+
+/** Materi panel: image slots for the current layout, with remove. Upload/replace happens on the canvas. */
+function MateriImageSettings({
+  slide,
+  onChange,
+}: {
+  slide: Slide;
+  onChange: (patch: Partial<Slide>) => void;
+}) {
+  const layout = slide.layout ?? 'teks';
+  const slots =
+    layout === 'teks'
+      ? []
+      : layout === 'teks-gambar'
+        ? [{ key: 'image' as const, label: 'Gambar 1', url: slide.image }]
+        : [
+          { key: 'image' as const, label: 'Gambar 1', url: slide.image },
+          { key: 'image2' as const, label: 'Gambar 2', url: slide.image2 ?? '' },
+        ];
+
+  if (slots.length === 0) {
+    return <PanelNote>Pilih layout bergambar di bilah atas untuk menambahkan gambar.</PanelNote>;
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <Label>Gambar</Label>
+      {slots.map(({ key, label, url }) => (
+        <div key={key} className="flex items-center gap-3">
+          <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-base border-2 border-border bg-white">
+            {url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={url} alt="" className="size-full object-cover" />
+            ) : (
+              <ImageIcon className="size-4 text-foreground/40" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{label}</p>
+            <p className="text-xs text-foreground/60">{url ? 'Klik gambar di kanvas untuk mengganti' : 'Klik slot di kanvas untuk mengunggah'}</p>
+          </div>
+          {url && (
+            <Button variant="neutral" size="icon-sm" aria-label={`Hapus ${label}`} onClick={() => onChange({ [key]: '' })}>
+              <Trash2Icon className="size-4" />
+            </Button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1121,71 +1191,68 @@ function MateriCanvas({
   const layout = slide.layout ?? 'teks';
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Canvas */}
-      <div className="border-2 border-border rounded-base bg-white shadow-[4px_4px_0px_0px_var(--border)] overflow-hidden">
-        <div
-          className={`p-6 min-h-[280px] flex gap-4 ${layout === 'teks' ? 'flex-col' : 'flex-row items-start'
-            }`}
-        >
-          {/* Text column */}
-          <div className={`flex flex-col gap-3 ${layout !== 'teks' ? 'flex-1' : 'w-full'}`}>
-            <RichTextField
-              kind="title"
-              doc={slide.titleDoc}
-              text={slide.title}
-              placeholder="Judul slide…"
-              testId="canvas-title"
-              className="text-2xl font-bold text-foreground outline-none border-b-2 border-transparent focus:border-main pb-1 min-h-[2.5rem]"
-              onChange={(titleDoc, title) => onChange({ titleDoc, title })}
-              onFocus={onEditorFocus}
-              onBlur={onEditorBlur}
-            />
-            <RichTextField
-              kind="body"
-              doc={slide.bodyDoc}
-              text={slide.body ?? ''}
-              placeholder="Deskripsi…"
-              testId="canvas-body"
-              className="text-base text-foreground/70 outline-none min-h-[5rem]"
-              onChange={(bodyDoc, body) => onChange({ bodyDoc, body })}
-              onFocus={onEditorFocus}
-              onBlur={onEditorBlur}
-            />
-          </div>
-
-          {/* Image slots */}
-          {(layout === 'teks-gambar' ||
-            layout === 'dua-gambar' ||
-            layout === 'dua-gambar-lr' ||
-            layout === 'dua-gambar-tb') && (
-              <div
-                className={`flex gap-3 ${layout === 'dua-gambar' || layout === 'dua-gambar-lr'
-                  ? 'flex-row flex-1'
-                  : layout === 'dua-gambar-tb'
-                    ? 'flex-col w-40 shrink-0'
-                    : 'w-40 shrink-0'
-                  }`}
-              >
-                <ImageSlot
-                  url={slide.image}
-                  label="Gambar 1"
-                  testId="image-slot-0"
-                  onUpload={(url) => onChange({ image: url })}
-                />
-                {(layout === 'dua-gambar' ||
-                  layout === 'dua-gambar-lr' ||
-                  layout === 'dua-gambar-tb') && (
-                    <ImageSlot
-                      url={slide.image2 ?? ''}
-                      label="Gambar 2"
-                      testId="image-slot-1"
-                      onUpload={(url) => onChange({ image2: url })}
-                    />
-                  )}
-              </div>
-            )}
+    <div className={`${canvasFrameClass} flex`}>
+      <div
+        className={`p-8 flex-1 flex gap-4 ${layout === 'teks' ? 'flex-col' : 'flex-row items-start'
+          }`}
+      >
+        {/* Text column */}
+        <div className={`flex flex-col gap-3 ${layout !== 'teks' ? 'flex-1' : 'w-full'}`}>
+          <RichTextField
+            kind="title"
+            doc={slide.titleDoc}
+            text={slide.title}
+            placeholder="Judul slide…"
+            testId="canvas-title"
+            className="text-2xl font-bold text-foreground outline-none border-b-2 border-transparent focus:border-main pb-1 min-h-[2.5rem]"
+            onChange={(titleDoc, title) => onChange({ titleDoc, title })}
+            onFocus={onEditorFocus}
+            onBlur={onEditorBlur}
+          />
+          <RichTextField
+            kind="body"
+            doc={slide.bodyDoc}
+            text={slide.body ?? ''}
+            placeholder="Deskripsi…"
+            testId="canvas-body"
+            className="text-base text-foreground/70 outline-none min-h-[5rem]"
+            onChange={(bodyDoc, body) => onChange({ bodyDoc, body })}
+            onFocus={onEditorFocus}
+            onBlur={onEditorBlur}
+          />
         </div>
+
+        {/* Image slots */}
+        {(layout === 'teks-gambar' ||
+          layout === 'dua-gambar' ||
+          layout === 'dua-gambar-lr' ||
+          layout === 'dua-gambar-tb') && (
+            <div
+              className={`flex gap-3 ${layout === 'dua-gambar' || layout === 'dua-gambar-lr'
+                ? 'flex-row flex-1'
+                : layout === 'dua-gambar-tb'
+                  ? 'flex-col w-40 shrink-0'
+                  : 'w-40 shrink-0'
+                }`}
+            >
+              <ImageSlot
+                url={slide.image}
+                label="Gambar 1"
+                testId="image-slot-0"
+                onUpload={(url) => onChange({ image: url })}
+              />
+              {(layout === 'dua-gambar' ||
+                layout === 'dua-gambar-lr' ||
+                layout === 'dua-gambar-tb') && (
+                  <ImageSlot
+                    url={slide.image2 ?? ''}
+                    label="Gambar 2"
+                    testId="image-slot-1"
+                    onUpload={(url) => onChange({ image2: url })}
+                  />
+                )}
+            </div>
+          )}
       </div>
     </div>
   );
