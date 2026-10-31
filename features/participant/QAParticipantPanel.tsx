@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { labels } from '@/domain/model';
-import { SLIDE_COLOR } from '@/lib/slide-colors';
+import { TypePill } from './ParticipantBits';
 import type { ParticipantView } from '@/contracts/views';
 import type { QuestionSubmit } from '@/contracts/commands';
 
@@ -37,12 +36,7 @@ export function QAParticipantPanel({ view, send }: { view: ParticipantView; send
 
   return (
     <div className="flex flex-col gap-4">
-      <span
-        className="inline-flex items-center self-start rounded-base border-2 border-black px-3 py-1 text-base font-bold shadow-[4px_4px_0_0_#000]"
-        style={{ backgroundColor: SLIDE_COLOR[slide.type] }}
-      >
-        {labels[slide.type]}
-      </span>
+      <TypePill type={slide.type} />
       <h2 className="text-xl font-black">{slide.title}</h2>
       {slide.body && <p className="text-base text-foreground/70">{slide.body}</p>}
 

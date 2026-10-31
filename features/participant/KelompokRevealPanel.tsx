@@ -1,112 +1,80 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Mic2, Users } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Mic2Icon } from 'lucide-react';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
 import type { ParticipantView } from '@/contracts/views';
+import { initials } from './ParticipantHeader';
+import { TypePill, WaitingPill } from './ParticipantBits';
 
+/** Participant view of the Pembagian Kelompok slide: waiting, then "your group" card. */
 export function KelompokRevealPanel({ view }: { view: ParticipantView }) {
   const slide = view.activeSlide;
   const group = view.myGroup;
-  const [revealed, setRevealed] = useState(false);
-
-  useEffect(() => {
-    if (group) {
-      // Trigger reveal animation on mount or when group data arrives
-      const t = setTimeout(() => setRevealed(true), 50);
-      return () => clearTimeout(t);
-    }
-  }, [group?.id]);
-
-  if (!group) {
-    return (
-      <div className="flex flex-col gap-3">
-        <span
-          className="inline-flex items-center self-start rounded-base border-2 border-black px-3 py-1 text-sm font-bold shadow-[2px_2px_0_0_#000]"
-          style={{ backgroundColor: SLIDE_COLOR['kelompok'] }}
-        >
-          Pembagian Kelompok
-        </span>
-        <h2 className="text-lg font-bold">{slide.title}</h2>
-        <p className="text-sm text-foreground/70 text-center py-6 animate-pulse">
-          Menunggu pembagian kelompok…
-        </p>
-      </div>
-    );
-  }
-
   const isResponder = view.subRole === 'penjawab';
 
   return (
     <div className="flex flex-col gap-4">
-      <span
-        className="inline-flex items-center self-start rounded-base border-2 border-black px-3 py-1 text-sm font-bold shadow-[2px_2px_0_0_#000]"
-        style={{ backgroundColor: SLIDE_COLOR['kelompok'] }}
-      >
-        Pembagian Kelompok
-      </span>
-      <h2 className="text-lg font-bold">{slide.title}</h2>
+      <TypePill type="kelompok" />
+      <h2 className="text-xl font-black leading-snug">{slide.title}</h2>
 
-      {/* Reveal card with animation */}
-      <div
-        className={`transition-all duration-500 motion-reduce:transition-none ${
-          revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-        }`}
-        data-testid="group-reveal-card"
-      >
-        <Card className="border-2 border-foreground shadow-[4px_4px_0_0_var(--border)] bg-main">
-          <CardContent className="pt-6 flex flex-col gap-4 items-center text-center">
-            <div className="text-5xl font-black">
-              Kelompok {group.number}
-            </div>
+      {!group ? (
+        <WaitingPill>Menunggu presenter membagi kelompok</WaitingPill>
+      ) : (
+        <section
+          data-testid="group-reveal-card"
+          className="animate-in fade-in slide-in-from-bottom-4 overflow-hidden rounded-base border-2 border-border bg-secondary-background shadow-[4px_4px_0_0_var(--border)] duration-500 motion-reduce:animate-none"
+        >
+          <header className="border-b-2 border-border px-5 py-4 text-center" style={{ backgroundColor: SLIDE_COLOR.kelompok }}>
+            <p className="text-xs font-bold uppercase tracking-wide">Kelompokmu</p>
+            <p className="text-4xl font-black">Kelompok {group.number}</p>
+          </header>
 
-            {/* Role badge */}
+          <div className="flex flex-col gap-4 p-5">
             {isResponder ? (
-              <div
-                className="flex items-center gap-2 bg-main border-2 border-foreground rounded px-3 py-1 font-semibold text-sm"
+              <p
                 data-testid="role-responder"
+                className="flex items-start gap-2 rounded-base border-2 border-border bg-main px-3 py-2.5 text-sm font-semibold text-main-foreground"
               >
-                <Mic2 className="size-4 shrink-0" strokeWidth={2.5} /> Kamu penjawab kelompok
-              </div>
+                <Mic2Icon className="mt-0.5 size-4 shrink-0" />
+                Kamu penjawab. Kamu yang mengirim jawaban untuk kelompok ini.
+              </p>
             ) : (
-              <div
-                className="flex items-center gap-2 bg-secondary-background border-2 border-border rounded px-3 py-1 text-sm"
-                data-testid="role-member"
-              >
-                <Users className="size-4 shrink-0" strokeWidth={2.5} /> Kamu anggota kelompok
-              </div>
+              <p data-testid="role-member" className="rounded-base border-2 border-border px-3 py-2.5 text-sm">
+                Kamu anggota. Diskusikan bersama — <strong>{group.responderName}</strong> akan mengirim jawaban.
+              </p>
             )}
 
-            {/* Members list */}
-            <div className="flex flex-wrap gap-2 justify-center">
-              {group.members.map((m) => (
-                <span
-                  key={m.id}
-                  className={`px-2 py-1 rounded border text-xs font-medium ${
-                    m.id === view.pid ? 'bg-main border-foreground font-bold shadow-[1px_1px_0_0_#000]' : 'bg-secondary-background border-border'
-                  }`}
-                >
-                  {m.name}
-                </span>
-              ))}
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-bold text-foreground/70">Anggota ({group.members.length})</p>
+              <ul className="flex flex-col gap-1.5">
+                {group.members.map((m) => {
+                  const isMe = m.id === view.pid;
+                  const isResp = m.name === group.responderName;
+                  return (
+                    <li key={m.id} className={`flex items-center gap-2.5 text-sm ${m.online ? '' : 'text-foreground/50'}`}>
+                      <span
+                        aria-hidden="true"
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-border text-[10px] font-black ${isMe ? 'bg-main text-main-foreground' : 'bg-background'}`}
+                      >
+                        {initials(m.name)}
+                      </span>
+                      <span className={`min-w-0 flex-1 truncate ${isMe ? 'font-bold' : ''}`}>
+                        {m.name}
+                        {isMe && <span className="ml-1.5 text-xs font-semibold text-foreground/70">(Kamu)</span>}
+                      </span>
+                      {isResp && (
+                        <span className="flex items-center gap-1 text-[11px] font-bold">
+                          <Mic2Icon className="size-3.5" /> Penjawab
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-
-            {/* Instruction */}
-            {isResponder ? (
-              <p className="text-sm text-foreground/70">
-                Kamu yang akan mengirim jawaban untuk kelompok ini.
-              </p>
-            ) : (
-              <p className="text-sm text-foreground/70">
-                Diskusikan bersama.{' '}
-                <span className="font-semibold text-foreground">{group.responderName}</span>{' '}
-                akan mengirim jawaban.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
