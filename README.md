@@ -1,5 +1,7 @@
 # KARSA Frontend
 
+<img src="https://raw.githubusercontent.com/radhitchocs/karsa-frontend/main/public/faveicon.svg" width="72" alt="KARSA logo" />
+
 Frontend Next.js untuk **KARSA** — platform presentasi interaktif berbahasa Indonesia.
 
 KARSA memungkinkan peserta masuk ke sesi via kode atau QR tanpa perlu membuat akun.
