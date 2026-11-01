@@ -7,6 +7,7 @@ import { API_BASE } from '@/lib/api';
 import { ProjectorLobbyView } from '@/features/projector/ProjectorLobbyView';
 import { ProjectorActiveView } from '@/features/projector/ProjectorActiveView';
 import { KarsaWordmark } from '@/components/KarsaWordmark';
+import { FullPageLoader } from '@/components/Loading';
 import type { ProjectorView } from '@/contracts/views';
 
 function useDisplayBase(): string {
@@ -74,7 +75,7 @@ export function ProjectorClient() {
   if (!view) {
     return (
       <main className="flex items-center justify-center h-screen bg-black">
-        <p className="text-white animate-pulse text-xl">Memuat proyektor…</p>
+        <FullPageLoader label="Memuat proyektor…" />
       </main>
     );
   }

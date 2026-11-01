@@ -13,6 +13,7 @@ import { ConnectionBanner } from '@/features/participant/ConnectionBanner';
 import { ParticipantHeader } from '@/features/participant/ParticipantHeader';
 import { CheckIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { FullPageLoader } from '@/components/Loading';
 import { Button } from '@/components/ui/button';
 import type { ParticipantView } from '@/contracts/views';
 import type { SessionCommandPayload } from '@/contracts/commands';
@@ -105,7 +106,7 @@ export function ParticipantClient() {
   if (!view) {
     return (
       <main className="flex flex-1 items-center justify-center">
-        <p className="text-foreground/70 animate-pulse">Memuat sesi…</p>
+        <FullPageLoader label="Memuat sesi…" />
       </main>
     );
   }

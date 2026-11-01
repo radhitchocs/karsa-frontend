@@ -22,6 +22,7 @@ import { getToken, clearToken } from '@/lib/auth';
 import { toast } from '@/components/ui/toast';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
 import { labels } from '@/domain/model';
+import { Spinner, SkeletonCard } from '@/components/Loading';
 import type { Kind } from '@/domain/model';
 
 type PresentationSummary = {
@@ -147,6 +148,7 @@ export function ProductionHomePage() {
                 className="w-56"
               />
               <Button type="submit" disabled={createMutation.isPending || !newTitle.trim()}>
+                {createMutation.isPending ? <Spinner className="mr-2" /> : null}
                 Buat
               </Button>
               <Button type="button" variant="neutral" onClick={() => setCreating(false)}>
@@ -159,7 +161,7 @@ export function ProductionHomePage() {
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-36 bg-secondary-background border-2 border-border rounded-base animate-pulse" />
+              <SkeletonCard key={i} />
             ))}
           </div>
         ) : presentations.length === 0 ? (

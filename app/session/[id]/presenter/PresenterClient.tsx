@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ApiSessionService } from '@/services/api-session-service';
 import { getToken } from '@/lib/auth';
 import { toast } from '@/components/ui/toast';
+import { FullPageLoader } from '@/components/Loading';
 import { LobbyView } from '@/features/presenter/LobbyView';
 import { ActiveView } from '@/features/presenter/ActiveView';
 import { SummaryView } from '@/features/presenter/SummaryView';
@@ -65,7 +66,7 @@ export function PresenterClient() {
   if (!view) {
     return (
       <main className="flex flex-1 items-center justify-center">
-        <p className="text-foreground/70 animate-pulse">Memuat sesi…</p>
+        <FullPageLoader label="Memuat sesi…" />
       </main>
     );
   }

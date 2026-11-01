@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { KarsaWordmark } from '@/components/KarsaWordmark';
+import { Spinner } from '@/components/Loading';
 import { apiFetch } from '@/lib/api';
 import { setToken } from '@/lib/auth';
 
@@ -76,6 +77,7 @@ export default function LoginPage() {
                 </p>
               )}
               <Button type="submit" disabled={loading} className="w-full">
+                {loading ? <Spinner className="mr-2" /> : null}
                 {loading ? 'Memuat…' : 'Masuk'}
               </Button>
               <p className="text-center text-sm text-foreground/60">

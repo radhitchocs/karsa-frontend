@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 import { type Kind, type Slide, labels } from '@/domain/model';
 import { SLIDE_COLOR } from '@/lib/slide-colors';
+import { FullPageLoader } from '@/components/Loading';
 
 export type SessionResult = {
   id: string;
@@ -71,7 +72,7 @@ export function ResultsArea({ presentationId, slides }: { presentationId: string
   });
 
   if (isLoading) {
-    return <div className="flex flex-1 items-center justify-center p-8 text-foreground/70">Memuat hasil…</div>;
+    return <div className="flex flex-1 items-center justify-center p-8"><FullPageLoader label="Memuat hasil…" /></div>;
   }
   if (!results || results.length === 0) {
     return (

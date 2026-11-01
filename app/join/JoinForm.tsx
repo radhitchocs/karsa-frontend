@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Spinner } from '@/components/Loading';
 import { apiFetch } from '@/lib/api';
 import { setParticipantAuth } from '@/lib/participant-auth';
 
@@ -81,11 +82,12 @@ export function JoinForm() {
               />
             </div>
             {error && (
-              <p data-testid="join-error" className="text-sm text-foreground border-2 border-[var(--error)] rounded px-3 py-2 bg-secondary-background">
+              <p data-testid="join-error" role="alert" className="text-sm text-foreground border-2 border-[var(--error)] rounded px-3 py-2 bg-secondary-background animate-shake">
                 {error}
               </p>
             )}
             <Button type="submit" disabled={loading} className="min-h-[48px]">
+              {loading ? <Spinner className="mr-2" /> : null}
               {loading ? 'Menghubungkan…' : 'Gabung'}
             </Button>
           </form>

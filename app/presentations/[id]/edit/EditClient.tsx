@@ -29,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dropzone } from '@/components/ui/dropzone';
 import { NumberStepper } from '@/components/ui/number-stepper';
 import { Label } from '@/components/ui/label';
+import { Spinner, FullPageLoader } from '@/components/Loading';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
@@ -401,7 +402,7 @@ export function EditClient() {
   if (isLoading) {
     return (
       <main className="flex flex-1 items-center justify-center">
-        <p>Memuat…</p>
+        <FullPageLoader label="Memuat presentasi…" />
       </main>
     );
   }
@@ -425,8 +426,9 @@ export function EditClient() {
               <div className="absolute left-full top-1/2 ml-3 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap">
                 {saveStatusLabel[saveStatus] && (
                   <span
-                    className={`text-xs ${saveStatus === 'conflict' || saveStatus === 'error' ? 'text-[var(--error)]' : 'text-foreground/70'}`}
+                    className={`flex items-center gap-1 text-xs ${saveStatus === 'conflict' || saveStatus === 'error' ? 'text-[var(--error)]' : 'text-foreground/70'}`}
                   >
+                    {saveStatus === 'saving' && <Spinner size={3} />}
                     {saveStatusLabel[saveStatus]}
                   </span>
                 )}
