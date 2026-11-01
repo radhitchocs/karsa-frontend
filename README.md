@@ -16,6 +16,12 @@ dipilih di slide yang sama.
 - **Live backend:** https://ey3fd1lp8646-production-2ljnp1e5.australia-southeast1.suga.run
 - **Demo video:** https://youtube.com/shorts/4d8b00FQk2M?feature=share
 
+### Akun Demo untuk Pengujian Juri
+
+Telah disediakan akun demo dengan beberapa data presentasi siap pakai untuk mempermudah evaluasi dan pengujian fitur:
+- **Email:** `demo@karsa.id`
+- **Password:** `demo1234`
+
 ---
 
 ## Package manager
